@@ -1950,6 +1950,68 @@ do
     end
 end
 
+    -- top bar (larger Nova Hub header: title + version pill, game name underneath)
+    local top = New("Frame", { Size = UDim2.new(1, 0, 0, TOP_H), Parent = main })
+    bind(win, top, "BackgroundColor3", "Surface")
+    corner(top, 12)
+    -- filler squares off the bottom corners so only the top ones stay round
+    local topFill = New("Frame", { Position = UDim2.new(0, 0, 1, -12), Size = UDim2.new(1, 0, 0, 12), Parent = top })
+    bind(win, topFill, "BackgroundColor3", "Surface")
+    local topLine = New("Frame", { Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), Parent = top })
+    bind(win, topLine, "BackgroundColor3", "Stroke")
+
+    local hubIcon = New("ImageLabel", {
+        Name = "HubIcon",
+        AnchorPoint = Vector2.new(0,0.5),
+        Position = UDim2.new(0,12,0,21),
+        Size = UDim2.fromOffset(24,24),
+        BackgroundTransparency = 1,
+        Image = opts.Icon or "" ,
+        Parent = top })
+    corner(hubIcon, 8)
+    task.spawn(function()
+        while dot.Parent do
+            tw(dotGlow, { Transparency = 0.42 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.75)
+            if not dot.Parent then break end
+            tw(dotGlow, { Transparency = 0.86 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.75)
+        end
+    end)
+
+    local titleText = opts.Title or "Nova Hub"
+    local titleMeasure = TextService:GetTextSize(titleText, 19, FONT_BOLD, Vector2.new(260, 30))
+    local titleW = math.min(titleMeasure.X + 4, 200)
+    local title = label(win, top, titleText, 19, "Text", FONT_BOLD)
+    title.Position = UDim2.fromOffset(44, 9)
+    title.Size = UDim2.fromOffset(titleW, 24)
+
+    -- the one and only version display
+    local versionPill = New("Frame", {
+        Position = UDim2.fromOffset(34 + titleW + 8, 12),
+        Size = UDim2.fromOffset(50, 19), BackgroundTransparency = 0.84, Parent = top })
+    bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
+    local versionText = label(win, versionPill, "v." .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
+    versionText.Size = UDim2.fromScale(1, 1)
+    versionText.TextXAlignment = Enum.TextXAlignment.Center
+    versionText.TextYAlignment = Enum.TextYAlignment.Center
+
+    -- game name row
+    local gameLbl = label(win, top, "", 11, "SubText")
+    gameLbl.Position = UDim2.fromOffset(34, 34)
+    gameLbl.Size = UDim2.new(1, -130, 0, 16)
+    win._gameLbl = gameLbl
+    win:_applyGameName()
+
+    if not opts.GameName then
+        task.spawn(function()
+            local ok, info = pcall(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
+            if ok and info and info.Name and info.Name ~= "" and win.Gui and win.Gui.Parent then
+                win:SetGameName(info.Name)
+            end
+        end)
+    end
+
     local function topButton(text, xOff, hoverKey)
         local b = New("TextButton", {
             Text = text, TextSize = 18, Font = FONT_BOLD, AnchorPoint = Vector2.new(1, 0.5),
