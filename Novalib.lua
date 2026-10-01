@@ -304,14 +304,15 @@ local function createNativeIcon(win, parent, kind)
     kind = tostring(kind or "misc")
 
     if kind == "home" then
-        -- house
-        strokeRect(3.5, 7, 11, 8, 2.2)
-        line2(2.8, 5.9, 9.0, 1.7, 0)
-        local roof = line2(4.2, 3.6, 1.7, 6.6, -45)
-        roof.Position = UDim2.fromOffset(3.9, 3.6)
-        local roof2 = line2(10.1, 3.6, 1.7, 6.6, 45)
-        roof2.Position = UDim2.fromOffset(12.2, 3.6)
-        line2(8, 11, 2, 4, 0)
+        -- polished dashboard/home icon: rounded house with clean proportions
+        local roof = strokeRect(3, 7, 12, 8, 2.5)
+        local roofLine = line2(3.5, 5.8, 11, 1.8, 0)
+        local left = line2(4, 4.2, 2, 5, -42)
+        left.Position = UDim2.fromOffset(3.3, 4.2)
+        local right = line2(12, 4.2, 2, 5, 42)
+        right.Position = UDim2.fromOffset(12.7, 4.2)
+        box(8, 10, 3, 5, 1.2)
+        box(5.2, 9.5, 1.5, 1.5, 0.7)
     elseif kind == "dashboard" then
         -- four balanced dashboard cards
         for _, pos in ipairs({{2,2},{10,2},{2,10},{10,10}}) do
@@ -1364,7 +1365,7 @@ local function createHomeDashboard(win, tab)
     kicker.Position = UDim2.fromOffset(18, 14)
     kicker.Size = UDim2.fromOffset(120, 14)
 
-    local welcome = label(win, hero, "Control center", 22, "Text", FONT_BOLD)
+    local welcome = label(win, hero, "Control Center", 24, "Text", FONT_BOLD)
     welcome.Position = UDim2.fromOffset(18, 31)
     welcome.Size = UDim2.new(0.46, 0, 0, 28)
 
