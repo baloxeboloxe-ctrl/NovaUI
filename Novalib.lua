@@ -1817,15 +1817,7 @@ function Library:CreateWindow(opts)
     title.Position = UDim2.fromOffset(44, 9)
     title.Size = UDim2.fromOffset(titleW, 24)
 
-    -- the one and only version display
-    local versionPill = New("Frame", {
-        Position = UDim2.fromOffset(34 + titleW + 8, 12),
-        Size = UDim2.fromOffset(50, 19), BackgroundTransparency = 0.84, Parent = top })
-    bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
-    local versionText = label(win, versionPill, "v." .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
-    versionText.Size = UDim2.fromScale(1, 1)
-    versionText.TextXAlignment = Enum.TextXAlignment.Center
-    versionText.TextYAlignment = Enum.TextYAlignment.Center
+
 
     -- game name row
     local gameLbl = label(win, top, "", 11, "SubText")
