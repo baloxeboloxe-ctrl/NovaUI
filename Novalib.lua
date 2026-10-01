@@ -1972,10 +1972,29 @@ function Window:Tab(opts)
     win._navOrder += 1
     if opts.Group and opts.Group ~= win._lastGroup then
         win._lastGroup = opts.Group
-        local gl = label(win, win.TabList, "▼  " .. string.upper(tostring(opts.Group)), 10, "SubText", FONT_BOLD)
-        gl.Size = UDim2.new(1, 0, 0, 30)
-        gl.LayoutOrder = win._navOrder
+        local gl = New("TextButton", {
+            Text = "▼  " .. string.upper(tostring(opts.Group)),
+            Font = FONT_BOLD,
+            TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            AutoButtonColor = false,
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 0, 0, 30),
+            LayoutOrder = win._navOrder,
+            Parent = win.TabList
+        })
+        bind(win, gl, "TextColor3", "SubText")
         pad(gl, 8, 4, 0, 0)
+
+        local groupChildren = {}
+        gl.MouseButton1Click:Connect(function()
+            gl.Text = gl.Text:sub(1,1) == "▼" and "▶  " .. string.upper(tostring(opts.Group)) or "▼  " .. string.upper(tostring(opts.Group))
+            for _, child in ipairs(groupChildren) do
+                child.Visible = not child.Visible
+            end
+        end)
+
+        win._activeGroupChildren = groupChildren
         win._navOrder += 1
     end
 
@@ -1985,6 +2004,10 @@ function Window:Tab(opts)
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
     corner(btn, 9)
+
+    if win._activeGroupChildren then
+        table.insert(win._activeGroupChildren, btn)
+    end
 
     local ind = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
