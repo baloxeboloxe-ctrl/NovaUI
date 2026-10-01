@@ -213,6 +213,7 @@ end
 local function createNativeIcon(win, parent, kind)
     local holder = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = parent })
     holder:SetAttribute("NovaIconKind", kind)
+    local iconScale = New("UIScale", { Scale = 0.72, Parent = holder })
 
     local parts = {}
     local function part(size, pos, radius, rotation, strokeMode)
@@ -1127,22 +1128,26 @@ function Library:CreateWindow(opts)
             task.wait(0.75)
         end
     end)
+    -- compact brand row: title -> version -> subtitle, with fixed bounds so nothing overlaps
+    local title = label(win, top, opts.Title or "NovaUI", 15, "Text", FONT_BOLD)
+    title.Position = UDim2.fromOffset(34, 0)
+    title.Size = UDim2.fromOffset(145, 46)
+    title.TextTruncate = Enum.TextTruncate.AtEnd
+
     local versionPill = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 34, 0.5, 0),
-        Size = UDim2.fromOffset(54, 20), BackgroundTransparency = 0.82, Parent = top })
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 186, 0.5, 0),
+        Size = UDim2.fromOffset(54, 19), BackgroundTransparency = 0.84, Parent = top })
     bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
     local versionText = label(win, versionPill, "v" .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
-    versionText.Size = UDim2.fromScale(1, 1); versionText.TextXAlignment = Enum.TextXAlignment.Center; versionText.TextYAlignment = Enum.TextYAlignment.Center
+    versionText.Size = UDim2.fromScale(1, 1)
+    versionText.TextXAlignment = Enum.TextXAlignment.Center
+    versionText.TextYAlignment = Enum.TextYAlignment.Center
 
-    local title = label(win, top, opts.Title or "NovaUI", 15, "Text", FONT_BOLD)
-    title.Position = UDim2.fromOffset(66, 0); title.Size = UDim2.new(0, 200, 1, 0)
     if opts.SubTitle then
-        title.Size = UDim2.new(0, 0, 1, 0); title.AutomaticSize = Enum.AutomaticSize.X
-        title.TextTruncate = Enum.TextTruncate.None
-        local sub = label(win, top, opts.SubTitle, 12, "SubText")
-        sub.Position = UDim2.new(0, 34, 0, 0); sub.Size = UDim2.new(0, 200, 1, 0)
-        local function place() sub.Position = UDim2.new(0, 66 + title.AbsoluteSize.X + 10, 0, 0) end
-        title:GetPropertyChangedSignal("AbsoluteSize"):Connect(place); task.defer(place)
+        local sub = label(win, top, opts.SubTitle, 11, "SubText")
+        sub.Position = UDim2.fromOffset(248, 0)
+        sub.Size = UDim2.new(0, 170, 1, 0)
+        sub.TextTruncate = Enum.TextTruncate.AtEnd
     end
 
     local function topButton(text, xOff, hoverKey)
@@ -1190,7 +1195,7 @@ function Library:CreateWindow(opts)
     local side = New("Frame", {
         Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 164, 1, -46), Parent = main })
     bind(win, side, "BackgroundColor3", "Surface")
-    side.BackgroundTransparency = 0.14
+    side.BackgroundTransparency = 0.26
     corner(side, 14)
     -- fillers square off the top and right corners; only bottom-left stays round (matches the window)
     local sideFillTop = New("Frame", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Parent = side })
@@ -1199,11 +1204,15 @@ function Library:CreateWindow(opts)
     bind(win, sideFillRight, "BackgroundColor3", "Surface")
     local sideLine = New("Frame", { Position = UDim2.new(1, -1, 0, 0), Size = UDim2.new(0, 1, 1, 0), BackgroundTransparency = 1, Parent = side })
     bind(win, sideLine, "BackgroundColor3", "Stroke")
+    local navLabel = label(win, side, "NAVIGATION", 9, "SubText", FONT_BOLD)
+    navLabel.Position = UDim2.fromOffset(14, 12)
+    navLabel.Size = UDim2.new(1, -28, 0, 14)
+
     local tabList = New("ScrollingFrame", {
-        Size = UDim2.new(1, -1, 1, 0), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, -1, 1, -28), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollBarThickness = 0, BackgroundTransparency = 1, Parent = side })
-    pad(tabList, 10, 10, 10, 10)
-    New("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = tabList })
+    pad(tabList, 10, 7, 10, 10)
+    New("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder, Parent = tabList })
     win.TabList = tabList
 
     -- content
@@ -1302,7 +1311,7 @@ function Window:_select(tab)
         local on = t == tab
         t.Page.Visible = on
         tw(t._btn, {
-            BackgroundTransparency = on and 0.84 or 1,
+            BackgroundTransparency = on and 0.90 or 1,
         }, 0.18, Enum.EasingStyle.Quint)
         tw(t._indicator, {
             BackgroundTransparency = on and 0 or 1,
@@ -1327,7 +1336,7 @@ function Window:_select(tab)
             end
         end
         if t._iconBubble then
-            tw(t._iconBubble, { BackgroundTransparency = on and 0.80 or 1 }, 0.18)
+            tw(t._iconBubble, { BackgroundTransparency = on and 0.90 or 1 }, 0.18)
         end
         if t._iconScale then
             tw(t._iconScale, { Scale = on and 1.08 or 1 }, 0.20, Enum.EasingStyle.Back)
@@ -1346,24 +1355,24 @@ function Window:Tab(opts)
     local tab = setmetatable({ Window = win }, Tab)
 
     local btn = New("TextButton", {
-        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 40),
+        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 34),
         BackgroundTransparency = 1, LayoutOrder = #win.Tabs + 1, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
-    corner(btn, 10)
+    corner(btn, 9)
 
     local ind = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
-        Size = UDim2.fromOffset(3, 7), BackgroundTransparency = 1, Parent = btn })
+        Size = UDim2.fromOffset(2, 7), BackgroundTransparency = 1, Parent = btn })
     bind(win, ind, "BackgroundColor3", "Accent"); corner(ind, 2)
 
     local tabGlow = glow(win, btn, 2.5, 0.94)
 
     local iconBubble = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.fromOffset(27, 27), BackgroundTransparency = 1, Parent = btn })
+        Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Parent = btn })
     bind(win, iconBubble, "BackgroundColor3", "Accent")
-    corner(iconBubble, 9)
+    corner(iconBubble, 7)
     local iconScale = New("UIScale", { Scale = 1, Parent = iconBubble })
 
     local iconValue = opts.Icon
@@ -1378,11 +1387,11 @@ function Window:Tab(opts)
             iconInst = New("ImageLabel", {
                 Image = toImage(iconValue), BackgroundTransparency = 1,
                 AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(17, 17), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
+                Size = UDim2.fromOffset(14, 14), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
         else
             -- Explicit text/emoji remains supported; automatic icons use native shapes so unsupported glyphs never become squares.
             iconInst = New("TextLabel", {
-                Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 14,
+                Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 12,
                 TextColor3 = win.Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center,
                 TextYAlignment = Enum.TextYAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = iconBubble })
         end
@@ -1393,8 +1402,8 @@ function Window:Tab(opts)
 
     local lbl = New("TextLabel", {
         Text = opts.Title or "Tab", Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(45, 0),
-        Size = UDim2.new(1, -(opts.Badge and 79 or 55), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
+        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(40, 0),
+        Size = UDim2.new(1, -(opts.Badge and 72 or 50), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
 
     local badge
     if opts.Badge ~= nil then
@@ -1402,7 +1411,7 @@ function Window:Tab(opts)
             Text = tostring(opts.Badge), Font = FONT_BOLD, TextSize = 9,
             TextColor3 = win.Theme.AccentText, BackgroundColor3 = win.Theme.Accent,
             BackgroundTransparency = 0.10, AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(28, 18),
+            Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(24, 17),
             TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Parent = btn })
         corner(badge, 9)
         bind(win, badge, "BackgroundColor3", "Accent")
@@ -1414,7 +1423,7 @@ function Window:Tab(opts)
         ScrollBarThickness = 3, BackgroundTransparency = 1, Visible = false, Parent = win.Content })
     page.ScrollBarImageColor3 = win.Theme.Accent
     table.insert(win._bound, { page, "ScrollBarImageColor3", "Accent" })
-    pad(page, 14, 14, 14, 14)
+    pad(page, 16, 16, 16, 16)
     New("UIListLayout", { Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
 
     tab._btn, tab._label, tab._indicator, tab.Page = btn, lbl, ind, page
@@ -1424,22 +1433,22 @@ function Window:Tab(opts)
     btn.MouseEnter:Connect(function()
         if win._active ~= tab then
             tw(btn, { BackgroundTransparency = 0.91 }, 0.16, Enum.EasingStyle.Quint)
-            tw(tabGlow, { Transparency = 0.80 }, 0.16, Enum.EasingStyle.Quint)
+            tw(tabGlow, { Transparency = 0.86 }, 0.16, Enum.EasingStyle.Quint)
         end
-        tw(iconScale, { Scale = win._active == tab and 1.12 or 1.07 }, 0.18, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 1.06 or 1.04 }, 0.18, Enum.EasingStyle.Back)
     end)
     btn.MouseLeave:Connect(function()
         if win._active ~= tab then
             tw(btn, { BackgroundTransparency = 1 }, 0.18, Enum.EasingStyle.Quint)
-            tw(tabGlow, { Transparency = 0.94 }, 0.18, Enum.EasingStyle.Quint)
+            tw(tabGlow, { Transparency = 0.96 }, 0.18, Enum.EasingStyle.Quint)
         end
-        tw(iconScale, { Scale = win._active == tab and 1.08 or 1 }, 0.18, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 1.05 or 1 }, 0.18, Enum.EasingStyle.Back)
     end)
     btn.MouseButton1Down:Connect(function()
-        tw(iconScale, { Scale = 0.94 }, 0.08, Enum.EasingStyle.Quad)
+        tw(iconScale, { Scale = 0.96 }, 0.08, Enum.EasingStyle.Quad)
     end)
     btn.MouseButton1Up:Connect(function()
-        tw(iconScale, { Scale = win._active == tab and 1.12 or 1.07 }, 0.14, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 1.06 or 1.04 }, 0.14, Enum.EasingStyle.Back)
     end)
     btn.MouseButton1Click:Connect(function() win:_select(tab) end)
 
