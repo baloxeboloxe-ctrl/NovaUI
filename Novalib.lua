@@ -230,105 +230,185 @@ local function newIconPart(parent, size, position, color, radius, rotation)
 end
 
 local function createNativeIcon(win, parent, kind)
+    -- Clean, consistent 18x18 vector-style icons. Every icon uses the same
+    -- visual weight, view-box, padding and alignment so tabs never jump around.
     local holder = New("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(14, 14), BackgroundTransparency = 1, Parent = parent
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(18, 18),
+        BackgroundTransparency = 1,
+        Parent = parent,
     })
     holder:SetAttribute("NovaIconKind", kind)
 
     local parts = {}
-    local function part(size, pos, radius, rotation, strokeMode)
-        local f = newIconPart(holder, size, pos, win.Theme.SubText, radius, rotation)
+    local STROKE = 1.65
+
+    local function bindPart(f)
         table.insert(parts, f)
-        if strokeMode then
-            local st = New("UIStroke", { Thickness = 1.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
-            bind(win, st, "Color", "SubText")
-        else
-            bind(win, f, "BackgroundColor3", "SubText")
-        end
+        bind(win, f, "BackgroundColor3", "SubText")
         return f
     end
 
+    local function box(x, y, w, h, r)
+        local f = New("Frame", {
+            Position = UDim2.fromOffset(x, y),
+            Size = UDim2.fromOffset(w, h),
+            BackgroundTransparency = 0,
+            Parent = holder,
+        })
+        if r then corner(f, r) end
+        return bindPart(f)
+    end
+
+    local function line(x, y, w, h, rotation)
+        -- Rounded micro-strokes for Lucide-like line art.
+        return box(x, y, w, h, math.max(1, math.min(w, h) / 2))
+            and (function(f)
+                f.Rotation = rotation or 0
+                f.BackgroundTransparency = 0
+                return f
+            end)(holder:GetChildren()[#holder:GetChildren()])
+    end
+
+    local function strokeRect(x, y, w, h, radius)
+        local f = New("Frame", {
+            Position = UDim2.fromOffset(x, y),
+            Size = UDim2.fromOffset(w, h),
+            BackgroundTransparency = 1,
+            Parent = holder,
+        })
+        corner(f, radius or 4)
+        local st = New("UIStroke", {
+            Thickness = STROKE,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            Parent = f,
+        })
+        bind(win, st, "Color", "SubText")
+        table.insert(parts, st)
+        return f
+    end
+
+    local function line2(x, y, w, h, rotation)
+        local f = New("Frame", {
+            Position = UDim2.fromOffset(x, y),
+            Size = UDim2.fromOffset(w, h),
+            BackgroundTransparency = 0,
+            Parent = holder,
+        })
+        corner(f, math.max(1, math.floor(math.min(w, h) / 2)))
+        f.Rotation = rotation or 0
+        return bindPart(f)
+    end
+
+    kind = tostring(kind or "misc")
+
     if kind == "home" then
-        -- Small, centered house. No Unicode glyphs, no oversized diagonals.
-        part(UDim2.fromOffset(8, 7), UDim2.fromOffset(4, 7), 2, 0)
-        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(2, 5), 1, -35)
-        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(8, 5), 1, 35)
-        part(UDim2.fromOffset(2, 4), UDim2.fromOffset(7, 10), 1, 0)
+        -- house
+        strokeRect(3.5, 7, 11, 8, 2.2)
+        line2(2.8, 5.9, 9.0, 1.7, 0)
+        local roof = line2(4.2, 3.6, 1.7, 6.6, -45)
+        roof.Position = UDim2.fromOffset(3.9, 3.6)
+        local roof2 = line2(10.1, 3.6, 1.7, 6.6, 45)
+        roof2.Position = UDim2.fromOffset(12.2, 3.6)
+        line2(8, 11, 2, 4, 0)
     elseif kind == "dashboard" then
-        -- Compact 2x2 grid for Main/Dashboard.
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(1, 1), 1)
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(10, 1), 1)
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(1, 10), 1)
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(10, 10), 1)
+        -- four balanced dashboard cards
+        for _, pos in ipairs({{2,2},{10,2},{2,10},{10,10}}) do
+            strokeRect(pos[1], pos[2], 6, 6, 1.8)
+        end
     elseif kind == "player" then
-        part(UDim2.fromOffset(6, 6), UDim2.fromOffset(5, 1), 3, 0)
-        part(UDim2.fromOffset(10, 6), UDim2.fromOffset(3, 9), 4, 0)
-    elseif kind == "visual" then
-        local ring = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 3), 5, 0, true)
-        ring.BackgroundTransparency = 1
-        part(UDim2.fromOffset(4, 4), UDim2.fromOffset(6, 6), 2, 0)
+        -- user silhouette
+        local head = New("Frame", {
+            Position = UDim2.fromOffset(6, 1.5), Size = UDim2.fromOffset(6, 6),
+            BackgroundTransparency = 1, Parent = holder,
+        })
+        corner(head, 3)
+        local hs = New("UIStroke", { Thickness = STROKE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = head })
+        bind(win, hs, "Color", "SubText"); table.insert(parts, hs)
+        local body = New("Frame", {
+            Position = UDim2.fromOffset(3.5, 9), Size = UDim2.fromOffset(11, 7),
+            BackgroundTransparency = 1, Parent = holder,
+        })
+        corner(body, 4)
+        local bs = New("UIStroke", { Thickness = STROKE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = body })
+        bind(win, bs, "Color", "SubText"); table.insert(parts, bs)
     elseif kind == "combat" then
-        local ring = part(UDim2.fromOffset(15, 15), UDim2.fromOffset(0, 0), 8, 0, true)
-        ring.BackgroundTransparency = 1
-        part(UDim2.fromOffset(2, 10), UDim2.fromOffset(7, 3), 1, 0)
-        part(UDim2.fromOffset(10, 2), UDim2.fromOffset(3, 7), 1, 0)
+        -- crosshair / target
+        local ring = strokeRect(2.5, 2.5, 13, 13, 6.5)
+        line2(8, 1, 2, 4, 0)
+        line2(8, 13, 2, 4, 0)
+        line2(1, 8, 4, 2, 0)
+        line2(13, 8, 4, 2, 0)
+        box(7, 7, 4, 4, 2)
+    elseif kind == "visual" then
+        -- eye
+        local eye = New("Frame", {
+            Position = UDim2.fromOffset(2, 5), Size = UDim2.fromOffset(14, 8),
+            BackgroundTransparency = 1, Parent = holder,
+        })
+        local es = New("UIStroke", { Thickness = STROKE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = eye })
+        bind(win, es, "Color", "SubText"); table.insert(parts, es)
+        corner(eye, 5)
+        local pupil = box(7, 7, 4, 4, 2)
+        local shine = box(9, 8, 1.2, 1.2, 1)
     elseif kind == "movement" then
-        part(UDim2.fromOffset(10, 2), UDim2.fromOffset(3, 5), 1, -35)
-        part(UDim2.fromOffset(7, 2), UDim2.fromOffset(6, 10), 1, -35)
-        part(UDim2.fromOffset(2, 6), UDim2.fromOffset(11, 5), 1, 0)
+        -- speed arrow
+        line2(3, 8, 9, 2, 0)
+        line2(10, 5, 6, 2, 45)
+        line2(10, 11, 6, 2, -45)
+        line2(2, 4, 6, 1.6, 0)
+        line2(2, 13, 6, 1.6, 0)
     elseif kind == "settings" then
-        -- Preserve the original compact gear style.
-        local gear = part(UDim2.fromOffset(10, 10), UDim2.fromOffset(2, 2), 3, 0, true)
-        gear.BackgroundTransparency = 1
-        part(UDim2.fromOffset(2, 12), UDim2.fromOffset(6, 1), 1, 0)
-        part(UDim2.fromOffset(12, 2), UDim2.fromOffset(1, 6), 1, 0)
-        part(UDim2.fromOffset(4, 4), UDim2.fromOffset(5, 5), 3, 0)
+        -- simple balanced gear
+        strokeRect(5, 5, 8, 8, 4)
+        box(8, 8, 2, 2, 1)
+        box(8, 0.7, 2, 4, 1)
+        box(8, 13.3, 2, 4, 1)
+        box(0.7, 8, 4, 2, 1)
+        box(13.3, 8, 4, 2, 1)
     elseif kind == "info" then
-        local ring = part(UDim2.fromOffset(15, 15), UDim2.fromOffset(0, 0), 8, 0, true)
-        ring.BackgroundTransparency = 1
-        local i = label(win, holder, "i", 11, "SubText", FONT_BOLD)
-        i.Size = UDim2.fromScale(1, 1)
-        i.TextXAlignment = Enum.TextXAlignment.Center
-        i.TextYAlignment = Enum.TextYAlignment.Center
-        table.insert(parts, i)
+        strokeRect(2.5, 2.5, 13, 13, 6.5)
+        box(8.1, 6, 1.8, 2, 0.9)
+        box(8.1, 9, 1.8, 5, 0.9)
     elseif kind == "keys" then
-        -- Keyboard: outlined body with three keys.
-        local body = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 2), 3, 0, true)
-        body.BackgroundTransparency = 1
-        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(3, 5), 1, 0)
-        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(6, 5), 1, 0)
-        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(9, 5), 1, 0)
-        part(UDim2.fromOffset(8, 2), UDim2.fromOffset(3, 8), 1, 0)
+        -- compact keyboard
+        strokeRect(1.5, 4, 15, 10, 2.8)
+        for _, x in ipairs({4, 7, 10}) do box(x, 7, 1.7, 1.7, 0.7) end
+        box(5, 10.5, 8, 1.7, 0.8)
     elseif kind == "games" then
-        -- Game controller: outlined pad, d-pad cross, action dot.
-        local body = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 2), 5, 0, true)
-        body.BackgroundTransparency = 1
-        part(UDim2.fromOffset(2, 6), UDim2.fromOffset(4, 4), 1, 0)
-        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(2, 6), 1, 0)
-        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(10, 6), 2, 0)
+        -- game controller
+        local padBody = New("Frame", {
+            Position = UDim2.fromOffset(1.5, 5), Size = UDim2.fromOffset(15, 9),
+            BackgroundTransparency = 1, Parent = holder,
+        })
+        corner(padBody, 4.5)
+        local ps = New("UIStroke", { Thickness = STROKE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = padBody })
+        bind(win, ps, "Color", "SubText"); table.insert(parts, ps)
+        box(4, 8, 4.5, 1.7, 0.8)
+        box(5.4, 6.6, 1.7, 4.5, 0.8)
+        box(11.3, 7, 2.2, 2.2, 1.1)
+        box(12.2, 6.1, 0.6, 0.6, 0.3)
+        box(10.9, 7.4, 0.6, 0.6, 0.3)
     else
-        part(UDim2.fromOffset(10, 10), UDim2.fromOffset(3, 3), 2, 45)
-        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(6, 6), 2, 0)
+        -- misc / fallback: clean sparkle
+        line2(8, 1, 2, 7, 0)
+        line2(5.5, 3.5, 7, 2, 0)
+        line2(8, 10, 2, 7, 0)
+        line2(5.5, 12.5, 7, 2, 0)
     end
 
     local function setOn(on)
         for _, item in ipairs(parts) do
-            if item:IsA("TextLabel") then
-                item.TextColor3 = on and win.Theme.Accent or win.Theme.SubText
+            if item:IsA("UIStroke") then
+                item.Color = on and win.Theme.Accent or win.Theme.SubText
             elseif item:IsA("Frame") then
-                local isStrokeOnly = item.BackgroundTransparency == 1
-                if isStrokeOnly then
-                    for _, c in ipairs(item:GetChildren()) do
-                        if c:IsA("UIStroke") then c.Color = on and win.Theme.Accent or win.Theme.SubText end
-                    end
-                else
-                    item.BackgroundColor3 = on and win.Theme.Accent or win.Theme.SubText
-                end
+                item.BackgroundColor3 = on and win.Theme.Accent or win.Theme.SubText
             end
         end
     end
 
+    setOn(false)
     return holder, setOn
 end
 
@@ -1843,14 +1923,14 @@ function Window:Tab(opts)
     if opts.Group and opts.Group ~= win._lastGroup then
         win._lastGroup = opts.Group
         local gl = label(win, win.TabList, string.upper(tostring(opts.Group)), 9, "SubText", FONT_BOLD)
-        gl.Size = UDim2.new(1, 0, 0, 18)
+        gl.Size = UDim2.new(1, 0, 0, 20)
         gl.LayoutOrder = win._navOrder
-        pad(gl, 4, 0, 0, 0)
+        pad(gl, 8, 4, 0, 0)
         win._navOrder += 1
     end
 
     local btn = New("TextButton", {
-        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 32),
+        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 36),
         BackgroundTransparency = 1, LayoutOrder = win._navOrder, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
@@ -1864,10 +1944,10 @@ function Window:Tab(opts)
     local tabGlow = glow(win, btn, 2.5, 0.94)
 
     local iconBubble = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.fromOffset(16, 16), BackgroundTransparency = 1, Parent = btn })
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 8, 0.5, 0),
+        Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Parent = btn })
     bind(win, iconBubble, "BackgroundColor3", "Accent")
-    corner(iconBubble, 7)
+    corner(iconBubble, 8)
     local iconScale = New("UIScale", { Scale = 1, Parent = iconBubble })
 
     local iconValue = opts.Icon
@@ -1882,7 +1962,7 @@ function Window:Tab(opts)
             iconInst = New("ImageLabel", {
                 Image = toImage(iconValue), BackgroundTransparency = 1,
                 AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(12, 12), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
+                Size = UDim2.fromOffset(18, 18), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
         else
             -- Explicit text/emoji remains supported; automatic icons use native shapes so unsupported glyphs never become squares.
             iconInst = New("TextLabel", {
@@ -1897,8 +1977,8 @@ function Window:Tab(opts)
 
     local lbl = New("TextLabel", {
         Text = opts.Title or "Tab", Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(31, 0),
-        Size = UDim2.new(1, -(opts.Badge and 62 or 42), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
+        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(38, 0),
+        Size = UDim2.new(1, -(opts.Badge and 68 or 48), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
 
     local badge
     if opts.Badge ~= nil then
