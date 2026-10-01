@@ -1250,59 +1250,165 @@ end
 --------------------------------------------------------------------------
 local function CreateSupportedGames(tab, opts)
     opts = opts or {}
+
     local win = tab.Window
     local games = opts.Games or {}
-    local statusKey = { Working = "Success", Updating = "Warning", Beta = "Accent", Patched = "Danger", Down = "Danger" }
+
+    local statusKey = {
+        Working = "Success",
+        Updating = "Warning",
+        Beta = "Accent",
+        Patched = "Danger",
+        Down = "Danger",
+    }
+
     local cards = {}
 
     for i, g in ipairs(games) do
-        local isCurrent = (g.PlaceId ~= nil and g.PlaceId == game.PlaceId)
+        local isCurrent =
+            (g.PlaceId ~= nil and g.PlaceId == game.PlaceId)
             or (g.UniverseId ~= nil and g.UniverseId == game.GameId)
+
         local status = g.Status or "Working"
         local colorKey = statusKey[status] or "Accent"
 
+        ------------------------------------------------------------------
+        -- ROW
+        ------------------------------------------------------------------
         local row = New("Frame", {
-            Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 0.04, LayoutOrder = i, Parent = tab.Page })
+            Size = UDim2.new(1, 0, 0, 58),
+            BackgroundTransparency = 0.04,
+            LayoutOrder = i,
+            Parent = tab.Page,
+        })
+
         bind(win, row, "BackgroundColor3", "Element")
         corner(row, 12)
         stroke(win, row, isCurrent and "Success" or "Stroke")
         glow(win, row, 3, 0.96)
 
+        ------------------------------------------------------------------
+        -- GAME ICON
+        -- Small + LEFT side
+        ------------------------------------------------------------------
         local chip = New("ImageLabel", {
             Name = "GameIcon",
-            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
-            Size = UDim2.fromOffset(58, 58), BackgroundTransparency = 1,
-            Image = g.Icon or "", Parent = row, ScaleType = Enum.ScaleType.Crop })
-        corner(chip, 10)
-        -- Static icon slot. Set g.Icon = "rbxassetid://YOUR_ICON_ID"
 
-        local reserve = 14 + 42 + 18
-        local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
-        name.Position = UDim2.fromOffset(58, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 12, 0.5, 0),
+
+            Size = UDim2.fromOffset(36, 36),
+
+            BackgroundTransparency = 1,
+            Image = g.Icon or "",
+            Parent = row,
+
+            ScaleType = Enum.ScaleType.Crop,
+        })
+
+        corner(chip, 9)
+
+        ------------------------------------------------------------------
+        -- TEXT
+        --
+        -- Leave enough room on the RIGHT for:
+        --   CURRENT 66px  + spacing
+        --   STATUS  92px
+        ------------------------------------------------------------------
+        local name = label(
+            win,
+            row,
+            tostring(g.Name or "Unknown"),
+            14,
+            "Text",
+            FONT_BOLD
+        )
+
+        name.Position = UDim2.fromOffset(60, 10)
+
+        -- Right-side space consumed by status/current badges.
+        local rightReserve = isCurrent and 188 or 114
+
+        name.Size = UDim2.new(
+            1,
+            -(60 + rightReserve),
+            0,
+            18
+        )
+
+        ------------------------------------------------------------------
+        -- OPTIONAL NOTE
+        ------------------------------------------------------------------
         local note = label(win, row, "", 12, "SubText")
         note.Visible = false
 
+        ------------------------------------------------------------------
+        -- STATUS PILL
+        ------------------------------------------------------------------
         local pill = New("Frame", {
-            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
-            Size = UDim2.fromOffset(92, 24), BackgroundTransparency = 0.82, Parent = row })
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -14, 0.5, 0),
+
+            Size = UDim2.fromOffset(92, 24),
+
+            BackgroundTransparency = 0.82,
+            Parent = row,
+        })
+
         bind(win, pill, "BackgroundColor3", colorKey)
         corner(pill, 12)
+
         local pdot = New("Frame", {
-            AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-            Size = UDim2.fromOffset(6, 6), Parent = pill })
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 10, 0.5, 0),
+
+            Size = UDim2.fromOffset(6, 6),
+
+            Parent = pill,
+        })
+
         bind(win, pdot, "BackgroundColor3", colorKey)
         corner(pdot, 3)
-        local ptxt = label(win, pill, string.upper(status), 9, colorKey, FONT_BOLD)
-        ptxt.Position = UDim2.fromOffset(22, 0); ptxt.Size = UDim2.new(1, -26, 1, 0)
+
+        local ptxt = label(
+            win,
+            pill,
+            string.upper(status),
+            9,
+            colorKey,
+            FONT_BOLD
+        )
+
+        ptxt.Position = UDim2.fromOffset(22, 0)
+        ptxt.Size = UDim2.new(1, -26, 1, 0)
         ptxt.TextYAlignment = Enum.TextYAlignment.Center
 
+        ------------------------------------------------------------------
+        -- CURRENT BADGE
+        ------------------------------------------------------------------
         if isCurrent then
             local cur = New("Frame", {
-                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -114, 0.5, 0),
-                Size = UDim2.fromOffset(66, 20), BackgroundTransparency = 0.82, Parent = row })
+                AnchorPoint = Vector2.new(1, 0.5),
+                Position = UDim2.new(1, -114, 0.5, 0),
+
+                Size = UDim2.fromOffset(66, 20),
+
+                BackgroundTransparency = 0.82,
+                Parent = row,
+            })
+
             bind(win, cur, "BackgroundColor3", "Success")
             corner(cur, 10)
-            local ctxt = label(win, cur, "CURRENT", 9, "Success", FONT_BOLD)
+
+            local ctxt = label(
+                win,
+                cur,
+                "CURRENT",
+                9,
+                "Success",
+                FONT_BOLD
+            )
+
             ctxt.Size = UDim2.fromScale(1, 1)
             ctxt.TextXAlignment = Enum.TextXAlignment.Center
             ctxt.TextYAlignment = Enum.TextYAlignment.Center
@@ -1311,7 +1417,15 @@ local function CreateSupportedGames(tab, opts)
         table.insert(cards, row)
     end
 
-    return { Instance = cards, Destroy = function() for _, c in ipairs(cards) do c:Destroy() end end }
+    return {
+        Instance = cards,
+
+        Destroy = function()
+            for _, c in ipairs(cards) do
+                c:Destroy()
+            end
+        end,
+    }
 end
 
 --------------------------------------------------------------------------
