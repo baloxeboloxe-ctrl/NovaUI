@@ -216,7 +216,7 @@ end
 local function createNativeIcon(win, parent, kind)
     local holder = New("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(16, 16), BackgroundTransparency = 1, Parent = parent
+        Size = UDim2.fromOffset(14, 14), BackgroundTransparency = 1, Parent = parent
     })
     holder:SetAttribute("NovaIconKind", kind)
 
@@ -262,12 +262,12 @@ local function createNativeIcon(win, parent, kind)
         part(UDim2.fromOffset(7, 2), UDim2.fromOffset(6, 10), 1, -35)
         part(UDim2.fromOffset(2, 6), UDim2.fromOffset(11, 5), 1, 0)
     elseif kind == "settings" then
-        -- Deliberately preserve the settings shape from the prior working version.
-        local gear = part(UDim2.fromOffset(11, 11), UDim2.fromOffset(8, 8), 3, 0, true)
+        -- Preserve the original compact gear style.
+        local gear = part(UDim2.fromOffset(10, 10), UDim2.fromOffset(2, 2), 3, 0, true)
         gear.BackgroundTransparency = 1
-        part(UDim2.fromOffset(3, 15), UDim2.fromOffset(12, 6), 1, 0)
-        part(UDim2.fromOffset(15, 3), UDim2.fromOffset(6, 12), 1, 0)
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(11, 11), 3, 0)
+        part(UDim2.fromOffset(2, 12), UDim2.fromOffset(6, 1), 1, 0)
+        part(UDim2.fromOffset(12, 2), UDim2.fromOffset(1, 6), 1, 0)
+        part(UDim2.fromOffset(4, 4), UDim2.fromOffset(5, 5), 3, 0)
     elseif kind == "info" then
         local ring = part(UDim2.fromOffset(15, 15), UDim2.fromOffset(0, 0), 8, 0, true)
         ring.BackgroundTransparency = 1
@@ -1481,7 +1481,7 @@ function Window:Tab(opts)
 
     local iconBubble = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.fromOffset(18, 18), BackgroundTransparency = 1, Parent = btn })
+        Size = UDim2.fromOffset(16, 16), BackgroundTransparency = 1, Parent = btn })
     bind(win, iconBubble, "BackgroundColor3", "Accent")
     corner(iconBubble, 7)
     local iconScale = New("UIScale", { Scale = 1, Parent = iconBubble })
@@ -1513,8 +1513,8 @@ function Window:Tab(opts)
 
     local lbl = New("TextLabel", {
         Text = opts.Title or "Tab", Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(34, 0),
-        Size = UDim2.new(1, -(opts.Badge and 66 or 46), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
+        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(31, 0),
+        Size = UDim2.new(1, -(opts.Badge and 62 or 42), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
 
     local badge
     if opts.Badge ~= nil then
