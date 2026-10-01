@@ -2156,4 +2156,256 @@ function Window:Notify(opts)
     return handle
 end
 
+
+--------------------------------------------------------------------------
+-- NOVA UI QUALITY LAYER (additive compatibility enhancements)
+-- Keeps the existing library/API intact. This layer only augments windows
+-- after the base implementation has finished building them.
+--------------------------------------------------------------------------
+local NOVA_QUALITY_GROUPS = {
+    Main = 10,
+    Features = 20,
+    Hub = 30,
+}
+
+local function novaInferGroup(title)
+    local s = string.lower(tostring(title or ""))
+    if s == "home" or s == "main" or s:find("home", 1, true) or s:find("dashboard", 1, true) then
+        return "Main"
+    end
+    if s:find("player", 1, true) or s:find("combat", 1, true) or s:find("aim", 1, true)
+        or s:find("target", 1, true) or s:find("visual", 1, true) or s:find("esp", 1, true)
+        or s:find("movement", 1, true) or s:find("speed", 1, true) or s:find("fly", 1, true) then
+        return "Features"
+    end
+    if s:find("misc", 1, true) or s:find("key", 1, true) or s:find("game", 1, true)
+        or s:find("setting", 1, true) or s:find("config", 1, true) or s:find("about", 1, true)
+        or s:find("info", 1, true) then
+        return "Hub"
+    end
+    return nil
+end
+
+local function novaFindTab(win, matcher)
+    local wanted = string.lower(tostring(matcher or ""))
+    for _, tab in ipairs(win.Tabs or {}) do
+        local title = string.lower(tostring(tab.Title or (tab._label and tab._label.Text) or ""))
+        if title == wanted or title:find(wanted, 1, true) then
+            return tab
+        end
+    end
+    return nil
+end
+
+local function novaThemeGlass(win, parent)
+    local sheen = New("Frame", {
+        Name = "NovaGlassSheen",
+        Position = UDim2.fromScale(0, 0), Size = UDim2.new(1, 0, 0, 1),
+        BackgroundTransparency = 0.72, ZIndex = 2, Parent = parent,
+    })
+    bind(win, sheen, "BackgroundColor3", "Accent")
+
+    local strokeLine = New("UIStroke", {
+        Thickness = 1,
+        Transparency = 0.86,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Parent = sheen,
+    })
+    bind(win, strokeLine, "Color", "Accent")
+
+    return sheen
+end
+
+local function novaAddHomeQuickLaunch(win, tab)
+    if not tab or tab._novaQuickLaunch then return end
+    tab._novaQuickLaunch = true
+
+    local holder = New("Frame", {
+        Name = "NovaQuickLaunch",
+        Size = UDim2.new(1, 0, 0, 74),
+        BackgroundTransparency = 1,
+        LayoutOrder = -998,
+        Parent = tab.Page,
+    })
+
+    local grid = New("UIGridLayout", {
+        CellSize = UDim2.new(1 / 3, -6, 1, 0),
+        CellPadding = UDim2.fromOffset(9, 0),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = holder,
+    })
+
+    local function launchCard(order, icon, title, description, finder)
+        local card = New("TextButton", {
+            Text = "", AutoButtonColor = false,
+            LayoutOrder = order, BackgroundTransparency = 0.14,
+            ZIndex = 2, Parent = holder,
+        })
+        bind(win, card, "BackgroundColor3", "Element")
+        corner(card, 13)
+        local st = stroke(win, card, "Stroke", 1)
+        local gl = glow(win, card, 3, 0.96)
+
+        local iconBubble = New("Frame", {
+            Position = UDim2.fromOffset(10, 11),
+            Size = UDim2.fromOffset(28, 28),
+            BackgroundTransparency = 0.84,
+            Parent = card,
+        })
+        bind(win, iconBubble, "BackgroundColor3", "Accent")
+        corner(iconBubble, 9)
+        local _, iconPaint = createNativeIcon(win, iconBubble, icon)
+        iconPaint(false)
+
+        local t = label(win, card, title, 12, "Text", FONT_BOLD)
+        t.Position = UDim2.fromOffset(48, 9)
+        t.Size = UDim2.new(1, -58, 0, 17)
+
+        local d = label(win, card, description, 10, "SubText")
+        d.Position = UDim2.fromOffset(48, 28)
+        d.Size = UDim2.new(1, -58, 0, 28)
+        d.TextWrapped = true
+        d.TextTruncate = Enum.TextTruncate.AtEnd
+        d.TextYAlignment = Enum.TextYAlignment.Top
+
+        card.MouseEnter:Connect(function()
+            tw(card, { BackgroundColor3 = win.Theme.ElementHover }, 0.13, Enum.EasingStyle.Quint)
+            tw(st, { Thickness = 1.35 }, 0.13, Enum.EasingStyle.Quint)
+            tw(gl, { Transparency = 0.78 }, 0.13, Enum.EasingStyle.Quint)
+            iconPaint(true)
+        end)
+        card.MouseLeave:Connect(function()
+            tw(card, { BackgroundColor3 = win.Theme.Element }, 0.16, Enum.EasingStyle.Quint)
+            tw(st, { Thickness = 1 }, 0.13, Enum.EasingStyle.Quint)
+            tw(gl, { Transparency = 0.96 }, 0.16, Enum.EasingStyle.Quint)
+            iconPaint(false)
+        end)
+        card.MouseButton1Click:Connect(function()
+            local target = finder and finder()
+            if target then win:_select(target) end
+        end)
+    end
+
+    launchCard(1, "visual", "ESP", "Open visual features and overlays.", function()
+        return novaFindTab(win, "visual") or novaFindTab(win, "esp")
+    end)
+    launchCard(2, "keys", "Fast Keys", "Jump to your quick-action bindings.", function()
+        return novaFindTab(win, "misc") or novaFindTab(win, "key")
+    end)
+    launchCard(3, "games", "Supported Games", "Browse support status and the current game.", function()
+        return novaFindTab(win, "supported games") or novaFindTab(win, "games")
+    end)
+end
+
+local function novaAddESPFeatureCard(win, tab, title)
+    if not tab or tab._novaESPCard then return end
+    local lower = string.lower(tostring(title or ""))
+    if not lower:find("visual", 1, true) and not lower:find("esp", 1, true) then return end
+
+    local alreadyExists = false
+    for _, d in ipairs(tab.Page:GetDescendants()) do
+        if d:IsA("TextLabel") and string.lower(tostring(d.Text or "")) == "esp" then
+            alreadyExists = true
+            break
+        end
+    end
+    if alreadyExists then return end
+
+    tab._novaESPCard = tab:FeatureCard({
+        Title = "ESP",
+        Description = "Visual feature card placeholder for your ESP implementation.",
+        Icon = "visual",
+        Tag = "VISUAL",
+        Default = false,
+        Notify = false,
+    })
+end
+
+local function novaApplyQuality(win)
+    if not win or win._novaQualityApplied or not win.Main then return end
+    win._novaQualityApplied = true
+
+    -- A single extra glass sheen instead of introducing another competing
+    -- version/status badge. The existing version pill remains the only one.
+    novaThemeGlass(win, win.Main)
+
+    -- Refine the existing header without changing its public API.
+    if win.Main then
+        local top = win.Main:FindFirstChildWhichIsA("Frame")
+        if top then
+            local topHighlight = New("Frame", {
+                Name = "NovaHeaderHighlight",
+                Position = UDim2.new(0, 12, 1, -2),
+                Size = UDim2.new(1, -24, 0, 2),
+                BackgroundTransparency = 0.20,
+                ZIndex = 3,
+                Parent = top,
+            })
+            bind(win, topHighlight, "BackgroundColor3", "Accent")
+            corner(topHighlight, 1)
+            task.spawn(function()
+                while topHighlight.Parent do
+                    tw(topHighlight, { BackgroundTransparency = 0.58 }, 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(1.6)
+                    if not topHighlight.Parent then break end
+                    tw(topHighlight, { BackgroundTransparency = 0.16 }, 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(1.6)
+                end
+            end)
+        end
+    end
+
+    -- Rebalance sidebar spacing by giving group labels a little more breathing room.
+    if win.TabList then
+        local list = win.TabList:FindFirstChildOfClass("UIListLayout")
+        if list then list.Padding = UDim.new(0, 6) end
+        local navLabel = win.TabList.Parent and win.TabList.Parent:FindFirstChild("TextLabel")
+        if navLabel then navLabel.Text = "NOVA NAVIGATION" end
+    end
+
+    -- Make the existing notification stack slightly more glass-like.
+    if win._notifyHolder then
+        win._notifyHolder.ZIndex = 60
+    end
+end
+
+-- Wrap the finished CreateWindow function rather than rewriting the base window
+-- implementation. Existing callers continue to use the same CreateWindow API.
+do
+    local _NovaBaseCreateWindow = Library.CreateWindow
+
+    Library.CreateWindow = function(self, opts)
+        local userOpts = opts or {}
+        local win = _NovaBaseCreateWindow(self, userOpts)
+        novaApplyQuality(win)
+
+        local baseTab = win.Tab
+        if not win._novaTabWrapper then
+            win._novaTabWrapper = true
+            win.Tab = function(w, tabOpts)
+                tabOpts = tabOpts or {}
+                local nextOpts = {}
+                for k, v in pairs(tabOpts) do nextOpts[k] = v end
+                if nextOpts.Group == nil then
+                    nextOpts.Group = novaInferGroup(nextOpts.Title)
+                end
+
+                local tab = baseTab(w, nextOpts)
+                tab._novaGroup = nextOpts.Group
+                tab._novaTitle = tostring(nextOpts.Title or "Tab")
+
+                -- Keep the requested ESP card UI confined to relevant tabs and
+                -- avoid duplicating it when the user already supplied one.
+                novaAddESPFeatureCard(w, tab, tab._novaTitle)
+                if string.lower(tab._novaTitle) == "home" or string.lower(tab._novaTitle):find("home", 1, true) then
+                    novaAddHomeQuickLaunch(w, tab)
+                end
+                return tab
+            end
+        end
+
+        return win
+    end
+end
+
 return Library
