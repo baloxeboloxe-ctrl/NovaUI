@@ -1262,19 +1262,24 @@ local function CreateSupportedGames(tab, opts)
 
         local chip = New("Frame", {
             AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0),
-            Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.86, Parent = row })
+            Size = UDim2.fromOffset(42, 42), BackgroundTransparency = 0, Parent = row })
         bind(win, chip, "BackgroundColor3", "Accent")
         corner(chip, 10)
-        local initial = label(win, chip, string.upper(string.sub(tostring(g.Name or "?"), 1, 1)), 14, "Accent", FONT_BOLD)
-        initial.Size = UDim2.fromScale(1, 1)
-        initial.TextXAlignment = Enum.TextXAlignment.Center
-        initial.TextYAlignment = Enum.TextYAlignment.Center
 
-        local reserve = 14 + 32 + 12 + 92 + 14 + (isCurrent and 76 or 0)
+        local icon = New("ImageLabel", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromScale(1, 1),
+            Image = (g.PlaceId and ("rbxthumb://type=GameIcon&id=" .. tostring(g.PlaceId) .. "&w=150&h=150")) or "",
+            ScaleType = Enum.ScaleType.Crop,
+            Parent = chip
+        })
+        corner(icon, 10)
+
+        local reserve = 14 + 42 + 12 + 92 + 14 + (isCurrent and 76 or 0)
         local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
-        name.Position = UDim2.fromOffset(58, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
+        name.Position = UDim2.fromOffset(68, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
         local note = label(win, row, g.Note or (g.PlaceId and ("Place ID: " .. tostring(g.PlaceId)) or ""), 12, "SubText")
-        note.Position = UDim2.fromOffset(58, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
+        note.Position = UDim2.fromOffset(68, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
 
         local pill = New("Frame", {
             AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
