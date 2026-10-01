@@ -28,7 +28,7 @@ local CoreGui            = game:GetService("CoreGui")
 local TextService        = game:GetService("TextService")
 local MarketplaceService = game:GetService("MarketplaceService")
 
-local Library = { Windows = {} }
+local Library = { Version = nil, Windows = {} }
 
 local TOP_H = 58 -- larger Nova Hub header
 
