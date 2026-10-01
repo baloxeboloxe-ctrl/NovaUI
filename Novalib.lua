@@ -1270,9 +1270,9 @@ local function CreateSupportedGames(tab, opts)
 
         local chip = New("ImageLabel", {
             Name = "GameIcon",
-            AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0),
-            Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.86,
-            Image = "", Parent = row })
+            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
+            Size = UDim2.fromOffset(42, 42), BackgroundTransparency = 0,
+            Image = "", Parent = row, ScaleType = Enum.ScaleType.Crop })
         corner(chip, 10)
         task.spawn(function()
             local ok, body = pcall(function()
@@ -1288,11 +1288,11 @@ local function CreateSupportedGames(tab, opts)
             end
         end)
 
-        local reserve = 14 + 32 + 12 + 92 + 14 + (isCurrent and 76 or 0)
+        local reserve = 14 + 42 + 18
         local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
         name.Position = UDim2.fromOffset(58, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
-        local note = label(win, row, g.Note or (g.PlaceId and ("Place ID: " .. tostring(g.PlaceId)) or ""), 12, "SubText")
-        note.Position = UDim2.fromOffset(58, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
+        local note = label(win, row, "", 12, "SubText")
+        note.Visible = false
 
         local pill = New("Frame", {
             AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
@@ -1689,10 +1689,15 @@ function Library:CreateWindow(opts)
     local topLine = New("Frame", { Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), Parent = top })
     bind(win, topLine, "BackgroundColor3", "Stroke")
 
-    local dot = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0, 21), Size = UDim2.fromOffset(10, 10), Parent = top })
-    bind(win, dot, "BackgroundColor3", "Accent"); corner(dot, 5)
-    local dotGlow = glow(win, dot, 4, 0.72)
+    local hubIcon = New("ImageLabel", {
+        Name = "HubIcon",
+        AnchorPoint = Vector2.new(0,0.5),
+        Position = UDim2.new(0,12,0,21),
+        Size = UDim2.fromOffset(24,24),
+        BackgroundTransparency = 1,
+        Image = opts.Icon or "" ,
+        Parent = top })
+    corner(hubIcon, 8)
     task.spawn(function()
         while dot.Parent do
             tw(dotGlow, { Transparency = 0.42 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
@@ -1707,7 +1712,7 @@ function Library:CreateWindow(opts)
     local titleMeasure = TextService:GetTextSize(titleText, 19, FONT_BOLD, Vector2.new(260, 30))
     local titleW = math.min(titleMeasure.X + 4, 200)
     local title = label(win, top, titleText, 19, "Text", FONT_BOLD)
-    title.Position = UDim2.fromOffset(34, 9)
+    title.Position = UDim2.fromOffset(44, 9)
     title.Size = UDim2.fromOffset(titleW, 24)
 
     -- the one and only version display
