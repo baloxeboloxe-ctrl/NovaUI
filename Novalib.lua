@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local UIS          = game:GetService("UserInputService")
 local Players      = game:GetService("Players")
 local CoreGui      = game:GetService("CoreGui")
+local TextService  = game:GetService("TextService")
 
 local Library = { Version = "1.0.0", Windows = {} }
 
@@ -967,15 +968,14 @@ function Library:CreateWindow(opts)
         BackgroundTransparency = 1, ClipsDescendants = true, Parent = main })
     win.Content = content
 
-    -- notifications
-    local holder = New("Frame", {
-        AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -16),
-        Size = UDim2.fromOffset(300, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1, Parent = gui })
-    New("UIListLayout", {
-        Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder,
-        VerticalAlignment = Enum.VerticalAlignment.Bottom, Parent = holder })
-    win._notifyHolder = holder
+    -- notifications (fixed-size holder: no AutomaticSize, so nothing can jitter)
+    win._notifyHolder = New("Frame", { BackgroundTransparency = 1, Active = false, Name = "Notifications", Parent = gui })
+    win._notifyLayout = New("UIListLayout", {
+        Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = win._notifyHolder })
+    win._notifyCount, win._notifyList = 0, {}
+    win._notifyWidth = opts.NotifyWidth or 300
+    local touchOnly = UIS.TouchEnabled and not UIS.KeyboardEnabled
+    win:SetNotifyPosition(opts.NotifyPosition or (touchOnly and "TopRight" or "BottomRight"))
 
     -- toggle key
     table.insert(win._conns, UIS.InputBegan:Connect(function(i, gp)
@@ -1088,52 +1088,136 @@ function Window:Tab(opts)
     return tab
 end
 
+function Window:_notifyW()
+    local cam = workspace.CurrentCamera
+    local vp = cam and cam.ViewportSize.X or 800
+    return math.max(180, math.min(self._notifyWidth, vp - 32))
+end
+
+--[[ Window:SetNotifyPosition("TopRight" | "TopLeft" | "BottomRight" | "BottomLeft") ]]
+function Window:SetNotifyPosition(pos)
+    pos = pos or "BottomRight"
+    local top, left = pos:find("Top") ~= nil, pos:find("Left") ~= nil
+    self._notifyPos = { top = top, left = left }
+    local m = 16
+    local h = self._notifyHolder
+    h.AnchorPoint = Vector2.new(left and 0 or 1, top and 0 or 1)
+    h.Position = UDim2.new(left and 0 or 1, left and m or -m, top and 0 or 1, top and m + 4 or -m)
+    h.Size = UDim2.new(0, self:_notifyW(), 1, -(m * 2 + 4))
+    self._notifyLayout.VerticalAlignment = top and Enum.VerticalAlignment.Top or Enum.VerticalAlignment.Bottom
+    self._notifyLayout.HorizontalAlignment = left and Enum.HorizontalAlignment.Left or Enum.HorizontalAlignment.Right
+end
+
+function Window:ClearNotifications()
+    for _, n in ipairs(table.clone(self._notifyList)) do n.Close() end
+end
+
 --[[
-    Window:Notify{ Title, Content, Duration (seconds), Type ("Info"|"Success"|"Warning"|"Error") }
+    Window:Notify{ Title, Content, Duration (seconds, 0 = stays until clicked),
+                   Type ("Info"|"Success"|"Warning"|"Error") }
+    Returns a handle: handle.Close()
+    Click a notification to dismiss it.
 ]]
 function Window:Notify(opts)
+    if type(opts) == "string" then opts = { Title = opts } end
     opts = opts or {}
     local win = self
-    local colorKey = ({ Info = "Accent", Success = "Success", Warning = "Warning", Error = "Danger" })[opts.Type or "Info"] or "Accent"
-    local duration = opts.Duration or 4
+    local T = win.Theme
+    local kind = opts.Type or "Info"
+    local color = T[({ Info = "Accent", Success = "Success", Warning = "Warning", Error = "Danger" })[kind] or "Accent"]
+    local glyph = ({ Info = "i", Success = "✓", Warning = "!", Error = "×" })[kind] or "i"
+    local duration = opts.Duration
+    if duration == nil then duration = 4 end
+    local timed = type(duration) == "number" and duration > 0 and duration < 3600
 
+    local width = win:_notifyW()
+    local title = opts.Title or "Notification"
+    local content = opts.Content or ""
+
+    -- keep the stack tidy: max 5 at once
+    while #win._notifyList >= 5 do win._notifyList[1].Close() end
+
+    -- measure text up front so the card has a fixed, exact height (no layout feedback loops)
+    local textX, textW = 50, width - 50 - 32
+    local textH = 0
+    if content ~= "" then
+        textH = math.ceil(TextService:GetTextSize(content, 13, FONT, Vector2.new(textW, 1000)).Y)
+    end
+    local height = 12 + 18 + (textH > 0 and (3 + textH) or 0) + (timed and 20 or 14)
+    height = math.max(height, 58)
+
+    win._notifyCount += 1
     local wrap = New("Frame", {
         BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y, Parent = win._notifyHolder })
-    local card = New("Frame", {
-        Position = UDim2.new(1, 40, 0, 0), Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y, ClipsDescendants = true, Parent = wrap })
-    card.BackgroundColor3 = win.Theme.Surface
+        LayoutOrder = win._notifyCount, Parent = win._notifyHolder })
+
+    local slide = win._notifyPos.left and -40 or 40
+    local card = New("CanvasGroup", {
+        Size = UDim2.new(1, 0, 0, height), Position = UDim2.fromOffset(slide, 0),
+        GroupTransparency = 1, BackgroundColor3 = T.Surface, Parent = wrap })
     corner(card, 10)
-    local st = New("UIStroke", { Color = win.Theme.Stroke, Parent = card })
-    pad(card, 16, 12, 12, 14)
-    New("UIListLayout", { Padding = UDim.new(0, 3), Parent = card })
+    New("UIStroke", { Color = T.Stroke, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = card })
 
-    local strip = New("Frame", { Size = UDim2.new(0, 4, 1, 0), Position = UDim2.fromOffset(-16, 0), Parent = card })
-    strip.BackgroundColor3 = win.Theme[colorKey]
-    local t = New("TextLabel", {
-        Text = opts.Title or "Notification", Font = FONT_BOLD, TextSize = 14, TextColor3 = win.Theme.Text,
-        TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, 0, 0, 18), Parent = card })
-    if opts.Content and opts.Content ~= "" then
+    local hit = New("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), Parent = card })
+
+    local icon = New("Frame", {
+        Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(28, 28),
+        BackgroundColor3 = color, BackgroundTransparency = 0.8, Parent = card })
+    corner(icon, 14)
+    New("TextLabel", {
+        Text = glyph, Font = FONT_BOLD, TextSize = 16, TextColor3 = color,
+        Size = UDim2.fromScale(1, 1), Parent = icon })
+
+    New("TextLabel", {
+        Text = title, Font = FONT_BOLD, TextSize = 14, TextColor3 = T.Text,
+        TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+        Position = UDim2.fromOffset(textX, 12), Size = UDim2.fromOffset(textW, 18), Parent = card })
+    if textH > 0 then
         New("TextLabel", {
-            Text = opts.Content, TextSize = 13, TextColor3 = win.Theme.SubText, TextWrapped = true,
+            Text = content, TextSize = 13, TextColor3 = T.SubText, TextWrapped = true,
             TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = card })
+            Position = UDim2.fromOffset(textX, 33), Size = UDim2.fromOffset(textW, textH), Parent = card })
     end
-    local bar = New("Frame", {
-        AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, -16, 1, 14),
-        Size = UDim2.new(1, 28, 0, 2), Parent = card, BackgroundColor3 = win.Theme[colorKey] })
-    bar.BackgroundTransparency = 0.3
+    New("TextLabel", {
+        Text = "×", Font = FONT_BOLD, TextSize = 16, TextColor3 = T.SubText,
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10),
+        Size = UDim2.fromOffset(16, 16), Parent = card })
 
-    tw(card, { Position = UDim2.new(0, 0, 0, 0) }, 0.3, Enum.EasingStyle.Back)
-    tw(bar, { Size = UDim2.new(0, 0, 0, 2) }, duration, Enum.EasingStyle.Linear)
+    local fill
+    if timed then
+        local track = New("Frame", {
+            Position = UDim2.new(0, 12, 1, -10), Size = UDim2.new(1, -24, 0, 3),
+            BackgroundColor3 = T.Stroke, Parent = card })
+        corner(track, 2)
+        fill = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, Parent = track })
+        corner(fill, 2)
+    end
 
-    task.delay(duration, function()
-        if not card.Parent then return end
-        tw(card, { Position = UDim2.new(1, 40, 0, 0) }, 0.25)
-        task.wait(0.28)
-        wrap:Destroy()
-    end)
+    -- handle / dismiss
+    local closed = false
+    local handle = {}
+    function handle.Close()
+        if closed then return end
+        closed = true
+        local i = table.find(win._notifyList, handle)
+        if i then table.remove(win._notifyList, i) end
+        tw(card, { Position = UDim2.fromOffset(slide, 0), GroupTransparency = 1 }, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        task.delay(0.2, function()
+            tw(wrap, { Size = UDim2.new(1, 0, 0, 0) }, 0.2)
+            task.delay(0.24, function() wrap:Destroy() end)
+        end)
+    end
+    table.insert(win._notifyList, handle)
+    hit.MouseButton1Click:Connect(handle.Close)
+
+    -- animate in: stack makes room first, card glides in while fading
+    tw(wrap, { Size = UDim2.new(1, 0, 0, height) }, 0.22)
+    tw(card, { Position = UDim2.fromOffset(0, 0), GroupTransparency = 0 }, 0.35, Enum.EasingStyle.Quint)
+    if timed then
+        tw(fill, { Size = UDim2.new(0, 0, 1, 0) }, duration, Enum.EasingStyle.Linear)
+        task.delay(duration, handle.Close)
+    end
+    return handle
 end
 
 return Library
