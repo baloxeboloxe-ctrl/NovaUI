@@ -1071,15 +1071,23 @@ end
 --------------------------------------------------------------------------
 -- STATIC ELEMENTS: Section / Label / Paragraph / Divider
 --------------------------------------------------------------------------
-local function CreateSection(tab, title)
+local function CreateSection(tab, title, icon)
     local win = tab.Window
     local holder = New("Frame", {
-        BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 26), Parent = tab.Page })
-    local l = label(win, holder, string.upper(title or "Section"), 12, "Accent", FONT_BOLD)
-    l.Size = UDim2.new(1, 0, 1, 0)
-    l.Position = UDim2.fromOffset(4, 4)
+        BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), Parent = tab.Page })
+
+    local line = New("Frame", {
+        BackgroundColor3 = win.Theme.Border, BorderSizePixel = 0,
+        Size = UDim2.new(1, -8, 0, 1), Position = UDim2.fromOffset(4, 30),
+        Parent = holder })
+
+    local prefix = icon and (tostring(icon) .. "  ") or "✦  "
+    local l = label(win, holder, prefix .. string.upper(title or "Section"), 13, "Accent", FONT_BOLD)
+    l.Size = UDim2.new(1, -8, 0, 28)
+    l.Position = UDim2.fromOffset(4, 0)
+
     local obj = { Instance = holder }
-    function obj:SetTitle(t) l.Text = string.upper(t) end
+    function obj:SetTitle(t) l.Text = prefix .. string.upper(t) end
     function obj:Destroy() holder:Destroy() end
     function obj:SetVisible(v) holder.Visible = v end
     return obj
@@ -1601,7 +1609,7 @@ function Tab:Input(o)          return CreateInput(self, o) end
 function Tab:Dropdown(o)       return CreateDropdown(self, o) end
 function Tab:Keybind(o)        return CreateKeybind(self, o) end
 function Tab:ColorPicker(o)    return CreateColorPicker(self, o) end
-function Tab:Section(t)        return CreateSection(self, t) end
+function Tab:Section(t, icon)    return CreateSection(self, t, icon) end
 function Tab:Label(t)          return CreateLabel(self, t) end
 function Tab:Paragraph(o)      return CreateParagraph(self, o) end
 function Tab:Divider()         return CreateDivider(self) end
