@@ -794,7 +794,7 @@ local function CreateDropdown(tab, opts)
 
     local hit = New("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 5, Parent = header })
     local arrow = New("TextLabel", {
-        Text = "▼", TextSize = 10, AnchorPoint = Vector2.new(1, 0.5),
+        Text = "▼", TextSize = 13, AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(16, 16), Parent = header })
     bind(win, arrow, "TextColor3", "SubText")
     local valueLbl = label(win, header, "", 13, "Accent", FONT_BOLD)
@@ -1779,7 +1779,7 @@ function Library:CreateWindow(opts)
 
     -- sidebar
     local side = New("Frame", {
-        Position = UDim2.fromOffset(0, TOP_H), Size = UDim2.new(0, 164, 1, -TOP_H), Parent = main })
+        Position = UDim2.fromOffset(0, TOP_H), Size = UDim2.new(0, 145, 1, -TOP_H), Parent = main })
     bind(win, side, "BackgroundColor3", "Surface")
     side.BackgroundTransparency = 0.26
     corner(side, 14)
@@ -1803,7 +1803,7 @@ function Library:CreateWindow(opts)
 
     -- content
     local content = New("Frame", {
-        Position = UDim2.fromOffset(164, TOP_H), Size = UDim2.new(1, -164, 1, -TOP_H),
+        Position = UDim2.fromOffset(145, TOP_H), Size = UDim2.new(1, -145, 1, -TOP_H),
         BackgroundTransparency = 1, ClipsDescendants = true, Parent = main })
     win.Content = content
 
@@ -1979,7 +1979,7 @@ function Window:Tab(opts)
             TextXAlignment = Enum.TextXAlignment.Left,
             AutoButtonColor = false,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 30),
+            Size = UDim2.new(1, 0, 0, 38),
             LayoutOrder = win._navOrder,
             Parent = win.TabList
         })
@@ -1987,10 +1987,21 @@ function Window:Tab(opts)
         pad(gl, 8, 4, 0, 0)
 
         local groupChildren = {}
+        local collapsed = false
         gl.MouseButton1Click:Connect(function()
-            gl.Text = gl.Text:sub(1,1) == "▼" and "▶  " .. string.upper(tostring(opts.Group)) or "▼  " .. string.upper(tostring(opts.Group))
+            collapsed = not collapsed
+            gl.Text = collapsed and "▶  " .. string.upper(tostring(opts.Group)) or "▼  " .. string.upper(tostring(opts.Group))
             for _, child in ipairs(groupChildren) do
-                child.Visible = not child.Visible
+                if collapsed then
+                    local tw = TweenService:Create(child, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1, Size = UDim2.new(1,0,0,0)})
+                    tw:Play()
+                    task.delay(0.22, function() if collapsed then child.Visible = false end end)
+                else
+                    child.Visible = true
+                    child.Size = UDim2.new(1,0,0,0)
+                    local tw = TweenService:Create(child, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1, Size = UDim2.new(1,0,0,26)})
+                    tw:Play()
+                end
             end
         end)
 
@@ -1999,7 +2010,7 @@ function Window:Tab(opts)
     end
 
     local btn = New("TextButton", {
-        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 30),
+        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 26),
         BackgroundTransparency = 1, LayoutOrder = win._navOrder, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
