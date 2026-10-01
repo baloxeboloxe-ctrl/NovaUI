@@ -1271,22 +1271,10 @@ local function CreateSupportedGames(tab, opts)
         local chip = New("ImageLabel", {
             Name = "GameIcon",
             AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
-            Size = UDim2.fromOffset(42, 42), BackgroundTransparency = 0,
-            Image = "", Parent = row, ScaleType = Enum.ScaleType.Crop })
+            Size = UDim2.fromOffset(58, 58), BackgroundTransparency = 1,
+            Image = g.Icon or "", Parent = row, ScaleType = Enum.ScaleType.Crop })
         corner(chip, 10)
-        task.spawn(function()
-            local ok, body = pcall(function()
-                return game:HttpGet("https://thumbnails.roblox.com/v1/places/icons?placeIds=" .. tostring(g.PlaceId or 0) .. "&size=150x150&format=Png&isCircular=false")
-            end)
-            if ok then
-                local ok2, data = pcall(function()
-                    return game:GetService("HttpService"):JSONDecode(body)
-                end)
-                if ok2 and data and data.data and data.data[1] and data.data[1].imageUrl then
-                    chip.Image = data.data[1].imageUrl
-                end
-            end
-        end)
+        -- Static icon slot. Set g.Icon = "rbxassetid://YOUR_ICON_ID"
 
         local reserve = 14 + 42 + 18
         local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
