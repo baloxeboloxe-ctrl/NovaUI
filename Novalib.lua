@@ -4,19 +4,33 @@
     Elements (each one is its own independent function):
         Tab:Section / Label / Paragraph / Divider
         Tab:Button / Toggle / Slider / Input / Dropdown / Keybind / ColorPicker
+        Tab:FeatureCard   (toggle presented as an icon feature card, e.g. ESP)
+        Tab:FastKeys      (grid of rebindable quick-action keys)
+        Tab:SupportedGames(list of supported games with status + "current" marker)
     Window:
-        Window:Tab, Window:Notify, Window:SetTheme, Window:Toggle, Window:Destroy
+        Window:Tab{ Title, Icon, Badge, Group }
+        Window:MiscTab, Window:SupportedGamesTab
+        Window:Notify, Window:SetTheme, Window:Toggle, Window:Destroy
+        Window:SetSnow, Window:SetScriptStatus, Window:SetPlayerPlan
     Themes:
         Dark, Light, Ocean, Rose, Emerald, Amethyst  (or pass your own table)
+
+    Suggested tab organisation (use the Group option to get sidebar headers):
+        Group "Main"     -> Home
+        Group "Features" -> Player, Combat, Visuals, Movement
+        Group "Hub"      -> Misc, Supported Games, Settings
 ]]
 
-local TweenService = game:GetService("TweenService")
-local UIS          = game:GetService("UserInputService")
-local Players      = game:GetService("Players")
-local CoreGui      = game:GetService("CoreGui")
-local TextService  = game:GetService("TextService")
+local TweenService       = game:GetService("TweenService")
+local UIS                = game:GetService("UserInputService")
+local Players            = game:GetService("Players")
+local CoreGui            = game:GetService("CoreGui")
+local TextService        = game:GetService("TextService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
-local Library = { Version = "1.1.0", Windows = {} }
+local Library = { Version = "1.2.0", Windows = {} }
+
+local TOP_H = 58 -- larger Nova Hub header
 
 --------------------------------------------------------------------------
 -- THEMES
@@ -200,6 +214,8 @@ local function iconKindFor(title)
     if s:find("movement", 1, true) or s:find("speed", 1, true) or s:find("fly", 1, true) then return "movement" end
     if s:find("setting", 1, true) or s:find("config", 1, true) then return "settings" end
     if s:find("info", 1, true) or s:find("about", 1, true) then return "info" end
+    if s:find("key", 1, true) then return "keys" end
+    if s:find("game", 1, true) then return "games" end
     if s:find("script", 1, true) or s:find("misc", 1, true) then return "misc" end
     return "misc"
 end
@@ -276,6 +292,21 @@ local function createNativeIcon(win, parent, kind)
         i.TextXAlignment = Enum.TextXAlignment.Center
         i.TextYAlignment = Enum.TextYAlignment.Center
         table.insert(parts, i)
+    elseif kind == "keys" then
+        -- Keyboard: outlined body with three keys.
+        local body = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 2), 3, 0, true)
+        body.BackgroundTransparency = 1
+        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(3, 5), 1, 0)
+        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(6, 5), 1, 0)
+        part(UDim2.fromOffset(2, 2), UDim2.fromOffset(9, 5), 1, 0)
+        part(UDim2.fromOffset(8, 2), UDim2.fromOffset(3, 8), 1, 0)
+    elseif kind == "games" then
+        -- Game controller: outlined pad, d-pad cross, action dot.
+        local body = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 2), 5, 0, true)
+        body.BackgroundTransparency = 1
+        part(UDim2.fromOffset(2, 6), UDim2.fromOffset(4, 4), 1, 0)
+        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(2, 6), 1, 0)
+        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(10, 6), 2, 0)
     else
         part(UDim2.fromOffset(10, 10), UDim2.fromOffset(3, 3), 2, 45)
         part(UDim2.fromOffset(3, 3), UDim2.fromOffset(6, 6), 2, 0)
@@ -299,6 +330,29 @@ local function createNativeIcon(win, parent, kind)
     end
 
     return holder, setOn
+end
+
+-- icon chip used on feature cards (native shape icon or asset id) ---------
+local function makeIconChip(win, parent, icon, cleanup)
+    local chip = New("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+        Size = UDim2.fromOffset(28, 28), BackgroundTransparency = 0.86, Parent = parent })
+    bind(win, chip, "BackgroundColor3", "Accent")
+    corner(chip, 9)
+    local chipStroke = stroke(win, chip, "Accent", 1)
+    chipStroke.Transparency = 0.72
+    if isImage(icon) then
+        local img = New("ImageLabel", {
+            Image = toImage(icon), BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(16, 16), Parent = chip })
+        bind(win, img, "ImageColor3", "Accent")
+    else
+        local _, setOn = createNativeIcon(win, chip, tostring(icon))
+        setOn(true)
+        table.insert(cleanup, onTheme(win, function() setOn(true) end))
+    end
+    return chip
 end
 
 -- drag helper (mouse + touch) -------------------------------------------
@@ -325,13 +379,15 @@ end
 --------------------------------------------------------------------------
 -- ELEMENT BASE
 --------------------------------------------------------------------------
--- Builds the standard card: [ title / description ............ right-control ]
-local function makeRow(tab, title, desc, rightWidth)
+-- Builds the standard card: [ (icon) title / description ............ right-control ]
+-- iconKind is optional; when given, a feature-card icon chip is drawn on the left.
+local function makeRow(tab, title, desc, rightWidth, iconKind)
     local win = tab.Window
     local row = New("Frame", {
-        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = tab.Page })
+        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 0.04, Parent = tab.Page })
     bind(win, row, "BackgroundColor3", "Element")
-    corner(row, 11)
+    corner(row, 12)
     local rowStroke = stroke(win, row, "Stroke")
     local rowGlow = glow(win, row, 3, 0.96)
     row.MouseEnter:Connect(function()
@@ -346,26 +402,31 @@ local function makeRow(tab, title, desc, rightWidth)
 
     local header = New("Frame", {
         BackgroundTransparency = 1, LayoutOrder = 0,
-        Size = UDim2.new(1, 0, 0, desc and desc ~= "" and 54 or 42), Parent = row })
+        Size = UDim2.new(1, 0, 0, desc and desc ~= "" and 56 or 44), Parent = row })
     pad(header, 14, 0, 14, 0)
 
     local hasDesc = desc and desc ~= ""
     local rw = rightWidth or 0
+    local ix = iconKind and 38 or 0
     local titleLbl = label(win, header, title or "", 14, "Text", FONT_BOLD)
     titleLbl.AnchorPoint = Vector2.new(0, 0.5)
-    titleLbl.Position = UDim2.new(0, 0, 0.5, hasDesc and -9 or 0)
-    titleLbl.Size = UDim2.new(1, -(rw + 8), 0, 18)
+    titleLbl.Position = UDim2.new(0, ix, 0.5, hasDesc and -9 or 0)
+    titleLbl.Size = UDim2.new(1, -(rw + 8 + ix), 0, 18)
 
     local descLbl
     if hasDesc then
         descLbl = label(win, header, desc, 12, "SubText")
         descLbl.AnchorPoint = Vector2.new(0, 0.5)
-        descLbl.Position = UDim2.new(0, 0, 0.5, 10)
-        descLbl.Size = UDim2.new(1, -(rw + 8), 0, 14)
+        descLbl.Position = UDim2.new(0, ix, 0.5, 10)
+        descLbl.Size = UDim2.new(1, -(rw + 8 + ix), 0, 14)
     end
 
     local obj = { Instance = row, Title = title }
     local cleanup = {}
+
+    if iconKind then
+        makeIconChip(win, header, iconKind, cleanup)
+    end
 
     function obj:SetTitle(t) titleLbl.Text = t end
     function obj:SetDescription(t)
@@ -391,12 +452,12 @@ end
 
 --------------------------------------------------------------------------
 -- BUTTON
---  opts: Title, Description, Style ("Default" | "Accent"), Callback
+--  opts: Title, Description, Icon, Style ("Default" | "Accent"), Callback
 --------------------------------------------------------------------------
 local function CreateButton(tab, opts)
     opts = opts or {}
     local win = tab.Window
-    local row, header, obj, cleanup = makeRow(tab, opts.Title or "Button", opts.Description, 30)
+    local row, header, obj, cleanup = makeRow(tab, opts.Title or "Button", opts.Description, 30, opts.Icon)
 
     local accent = opts.Style == "Accent"
     local hit = New("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 5, Parent = header })
@@ -448,12 +509,13 @@ end
 
 --------------------------------------------------------------------------
 -- TOGGLE
---  opts: Title, Description, Default, Flag, Callback(value)
+--  opts: Title, Description, Icon, Tag, Default, Flag, Callback(value)
 --------------------------------------------------------------------------
 local function CreateToggle(tab, opts)
     opts = opts or {}
     local win = tab.Window
-    local row, header, obj, cleanup = makeRow(tab, opts.Title or "Toggle", opts.Description, 50)
+    local tagW = opts.Tag and 64 or 0
+    local row, header, obj, cleanup = makeRow(tab, opts.Title or "Toggle", opts.Description, 50 + tagW, opts.Icon)
     local value = opts.Default == true
 
     local hit = New("TextButton", { Text = "", Size = UDim2.fromScale(1, 1), ZIndex = 5, Parent = header })
@@ -465,6 +527,18 @@ local function CreateToggle(tab, opts)
         AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(16, 16),
         BackgroundColor3 = Color3.new(1, 1, 1), Parent = track })
     corner(knob, 8)
+
+    if opts.Tag then
+        local tag = New("Frame", {
+            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -54, 0.5, 0),
+            Size = UDim2.fromOffset(56, 18), BackgroundTransparency = 0.84, Parent = header })
+        bind(win, tag, "BackgroundColor3", "Accent")
+        corner(tag, 9)
+        local tagLbl = label(win, tag, string.upper(tostring(opts.Tag)), 9, "Accent", FONT_BOLD)
+        tagLbl.Size = UDim2.fromScale(1, 1)
+        tagLbl.TextXAlignment = Enum.TextXAlignment.Center
+        tagLbl.TextYAlignment = Enum.TextYAlignment.Center
+    end
 
     local function paint(instant)
         local t = instant and 0 or 0.18
@@ -501,8 +575,19 @@ local function CreateToggle(tab, opts)
 end
 
 --------------------------------------------------------------------------
+-- FEATURE CARD  (a Toggle presented as a proper icon card, e.g. ESP)
+--  opts: same as Toggle. Icon defaults to "visual"; Tag shows a small pill.
+--------------------------------------------------------------------------
+local function CreateFeatureCard(tab, opts)
+    local o = {}
+    for k, v in pairs(opts or {}) do o[k] = v end
+    o.Icon = o.Icon or "visual"
+    return CreateToggle(tab, o)
+end
+
+--------------------------------------------------------------------------
 -- SLIDER
---  opts: Title, Description, Min, Max, Default, Increment, Suffix, Flag, Callback(value)
+--  opts: Title, Description, Icon, Min, Max, Default, Increment, Suffix, Flag, Callback(value)
 --------------------------------------------------------------------------
 local function CreateSlider(tab, opts)
     opts = opts or {}
@@ -513,7 +598,7 @@ local function CreateSlider(tab, opts)
     local suffix = opts.Suffix or ""
     local value = clamp(opts.Default or min, min, max)
 
-    local row, header, obj = makeRow(tab, opts.Title or "Slider", opts.Description, 70)
+    local row, header, obj = makeRow(tab, opts.Title or "Slider", opts.Description, 70, opts.Icon)
     local valueLbl = label(win, header, "", 13, "Accent", FONT_BOLD)
     valueLbl.AnchorPoint = Vector2.new(1, 0.5)
     valueLbl.Position = UDim2.new(1, 0, 0.5, 0)
@@ -966,15 +1051,221 @@ local function CreateDivider(tab)
 end
 
 --------------------------------------------------------------------------
--- MAIN DASHBOARD
+-- FAST KEYS  (grid of rebindable quick-action keys)
+--  opts: Title, Description, Keys = { { Title, Default (Enum.KeyCode), Flag, Callback(), Changed(key) }, ... }
+--  Returns obj with obj.Keys[title] = { Set(key), Get() }
+--------------------------------------------------------------------------
+local function CreateFastKeys(tab, opts)
+    opts = opts or {}
+    local win = tab.Window
+    local keys = opts.Keys or {}
+
+    local card = New("Frame", {
+        Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 0.04, Parent = tab.Page })
+    bind(win, card, "BackgroundColor3", "Element")
+    corner(card, 12); stroke(win, card, "Stroke"); glow(win, card, 3, 0.96)
+    pad(card, 14, 12, 14, 14)
+    New("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = card })
+
+    local hasDesc = opts.Description and opts.Description ~= ""
+    local head = New("Frame", {
+        BackgroundTransparency = 1, LayoutOrder = 0, Size = UDim2.new(1, 0, 0, hasDesc and 34 or 18), Parent = card })
+    local t = label(win, head, opts.Title or "Fast Keys", 14, "Text", FONT_BOLD)
+    t.Size = UDim2.new(1, 0, 0, 18)
+    if hasDesc then
+        local d = label(win, head, opts.Description, 12, "SubText")
+        d.Position = UDim2.fromOffset(0, 19); d.Size = UDim2.new(1, 0, 0, 14)
+    end
+
+    local grid = New("Frame", {
+        BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = 1, Parent = card })
+    New("UIGridLayout", {
+        CellSize = UDim2.new(0.5, -4, 0, 42), CellPadding = UDim2.fromOffset(8, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+
+    local obj = { Instance = card, Keys = {} }
+
+    for i, k in ipairs(keys) do
+        local key = k.Default
+        local listening = false
+
+        local tile = New("Frame", { LayoutOrder = i, Parent = grid })
+        bind(win, tile, "BackgroundColor3", "Surface")
+        corner(tile, 9)
+        local tileStroke = stroke(win, tile, "Stroke")
+
+        local name = label(win, tile, k.Title or ("Key " .. i), 13, "Text", FONT_BOLD)
+        name.Position = UDim2.fromOffset(10, 0); name.Size = UDim2.new(1, -86, 1, 0)
+
+        local btn = New("TextButton", {
+            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+            Size = UDim2.fromOffset(66, 26), BackgroundTransparency = 0,
+            AutoButtonColor = false, TextSize = 12, Font = FONT_BOLD, Parent = tile })
+        bind(win, btn, "BackgroundColor3", "Element")
+        bind(win, btn, "TextColor3", "Accent")
+        corner(btn, 6)
+        local btnStroke = stroke(win, btn, "Stroke")
+
+        local function render()
+            btn.Text = listening and "..." or (key and key.Name or "None")
+        end
+        render()
+
+        tile.MouseEnter:Connect(function() tw(tileStroke, { Color = win.Theme.Accent }, 0.14) end)
+        tile.MouseLeave:Connect(function() tw(tileStroke, { Color = win.Theme.Stroke }, 0.14) end)
+
+        btn.MouseButton1Click:Connect(function()
+            listening = true; render()
+            tw(btnStroke, { Color = win.Theme.Accent }, 0.12)
+        end)
+
+        table.insert(win._conns, UIS.InputBegan:Connect(function(inp, gp)
+            if listening then
+                if inp.UserInputType == Enum.UserInputType.Keyboard then
+                    listening = false
+                    if inp.KeyCode == Enum.KeyCode.Escape then
+                        -- cancel
+                    elseif inp.KeyCode == Enum.KeyCode.Backspace then
+                        key = nil
+                        if k.Changed then task.spawn(k.Changed, nil) end
+                    else
+                        key = inp.KeyCode
+                        if k.Changed then task.spawn(k.Changed, key) end
+                    end
+                    setFlag(win, k, key)
+                    render()
+                    tw(btnStroke, { Color = win.Theme.Stroke }, 0.12)
+                end
+            elseif not gp and key and inp.KeyCode == key then
+                if k.Callback then task.spawn(k.Callback) end
+            end
+        end))
+        setFlag(win, k, key)
+
+        obj.Keys[k.Title or tostring(i)] = {
+            Set = function(nk) key = nk; setFlag(win, k, key); render() end,
+            Get = function() return key end,
+        }
+    end
+
+    function obj:SetVisible(v) card.Visible = v end
+    function obj:Destroy() card:Destroy() end
+    return obj
+end
+
+--------------------------------------------------------------------------
+-- SUPPORTED GAMES
+--  opts: Games = { { Name, PlaceId, UniverseId, Status ("Working"|"Updating"|"Beta"|"Patched"|"Down"), Note }, ... }
+--------------------------------------------------------------------------
+local function CreateSupportedGames(tab, opts)
+    opts = opts or {}
+    local win = tab.Window
+    local games = opts.Games or {}
+    local statusKey = { Working = "Success", Updating = "Warning", Beta = "Accent", Patched = "Danger", Down = "Danger" }
+    local cards = {}
+
+    for i, g in ipairs(games) do
+        local isCurrent = (g.PlaceId ~= nil and g.PlaceId == game.PlaceId)
+            or (g.UniverseId ~= nil and g.UniverseId == game.GameId)
+        local status = g.Status or "Working"
+        local colorKey = statusKey[status] or "Accent"
+
+        local row = New("Frame", {
+            Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 0.04, LayoutOrder = i, Parent = tab.Page })
+        bind(win, row, "BackgroundColor3", "Element")
+        corner(row, 12)
+        stroke(win, row, isCurrent and "Success" or "Stroke")
+        glow(win, row, 3, 0.96)
+
+        local chip = New("Frame", {
+            AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0),
+            Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.86, Parent = row })
+        bind(win, chip, "BackgroundColor3", "Accent")
+        corner(chip, 10)
+        local initial = label(win, chip, string.upper(string.sub(tostring(g.Name or "?"), 1, 1)), 14, "Accent", FONT_BOLD)
+        initial.Size = UDim2.fromScale(1, 1)
+        initial.TextXAlignment = Enum.TextXAlignment.Center
+        initial.TextYAlignment = Enum.TextYAlignment.Center
+
+        local reserve = 14 + 32 + 12 + 92 + 14 + (isCurrent and 76 or 0)
+        local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
+        name.Position = UDim2.fromOffset(58, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
+        local note = label(win, row, g.Note or (g.PlaceId and ("Place ID: " .. tostring(g.PlaceId)) or ""), 12, "SubText")
+        note.Position = UDim2.fromOffset(58, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
+
+        local pill = New("Frame", {
+            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
+            Size = UDim2.fromOffset(92, 24), BackgroundTransparency = 0.82, Parent = row })
+        bind(win, pill, "BackgroundColor3", colorKey)
+        corner(pill, 12)
+        local pdot = New("Frame", {
+            AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
+            Size = UDim2.fromOffset(6, 6), Parent = pill })
+        bind(win, pdot, "BackgroundColor3", colorKey)
+        corner(pdot, 3)
+        local ptxt = label(win, pill, string.upper(status), 9, colorKey, FONT_BOLD)
+        ptxt.Position = UDim2.fromOffset(22, 0); ptxt.Size = UDim2.new(1, -26, 1, 0)
+        ptxt.TextYAlignment = Enum.TextYAlignment.Center
+
+        if isCurrent then
+            local cur = New("Frame", {
+                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -114, 0.5, 0),
+                Size = UDim2.fromOffset(66, 20), BackgroundTransparency = 0.82, Parent = row })
+            bind(win, cur, "BackgroundColor3", "Success")
+            corner(cur, 10)
+            local ctxt = label(win, cur, "CURRENT", 9, "Success", FONT_BOLD)
+            ctxt.Size = UDim2.fromScale(1, 1)
+            ctxt.TextXAlignment = Enum.TextXAlignment.Center
+            ctxt.TextYAlignment = Enum.TextYAlignment.Center
+        end
+
+        table.insert(cards, row)
+    end
+
+    return { Instance = cards, Destroy = function() for _, c in ipairs(cards) do c:Destroy() end end }
+end
+
+--------------------------------------------------------------------------
+-- SNOW GFX LAYER (small drifting flakes over the whole window; no glyphs)
+--------------------------------------------------------------------------
+local function createSnow(win, main, count)
+    local layer = New("Frame", {
+        Name = "SnowLayer", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+        ClipsDescendants = true, Active = false, ZIndex = 40, Parent = main })
+    win._snow = layer
+    local rng = Random.new()
+    for _ = 1, count do
+        local size = rng:NextInteger(2, 4)
+        local flake = New("Frame", {
+            Size = UDim2.fromOffset(size, size), BackgroundColor3 = Color3.new(1, 1, 1),
+            BackgroundTransparency = rng:NextNumber(0.55, 0.85), ZIndex = 40, Parent = layer })
+        corner(flake, size)
+        task.spawn(function()
+            task.wait(rng:NextNumber(0, 8))
+            while flake.Parent do
+                local x = rng:NextNumber(0, 1)
+                local drift = rng:NextNumber(-0.06, 0.06)
+                local dur = rng:NextNumber(7, 13)
+                flake.Position = UDim2.new(x, 0, 0, -8)
+                tw(flake, { Position = UDim2.new(x + drift, 0, 1, 8) }, dur, Enum.EasingStyle.Linear)
+                task.wait(dur)
+            end
+        end)
+    end
+end
+
+--------------------------------------------------------------------------
+-- HOME DASHBOARD
 --------------------------------------------------------------------------
 local function createHomeDashboard(win, tab)
     local page = tab.Page
     local holder = New("Frame", {
-        Size = UDim2.new(1, 0, 0, 148), BackgroundTransparency = 1, LayoutOrder = -1000, Parent = page
+        Size = UDim2.new(1, 0, 0, 196), BackgroundTransparency = 1, LayoutOrder = -1000, Parent = page
     })
 
-    -- One floating surface instead of two classic cards.
+    -- One floating glass surface.
     local hero = New("Frame", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 0.10, Parent = holder
     })
@@ -984,7 +1275,7 @@ local function createHomeDashboard(win, tab)
     local heroGlow = glow(win, hero, 4, 0.94)
 
     local accentRail = New("Frame", {
-        Position = UDim2.fromOffset(0, 16), Size = UDim2.fromOffset(3, 116), Parent = hero
+        Position = UDim2.fromOffset(0, 16), Size = UDim2.fromOffset(3, 164), Parent = hero
     })
     bind(win, accentRail, "BackgroundColor3", "Accent")
     corner(accentRail, 2)
@@ -1004,7 +1295,7 @@ local function createHomeDashboard(win, tab)
     hint.Size = UDim2.new(0.46, 0, 0, 16)
     hint.TextTruncate = Enum.TextTruncate.AtEnd
 
-    -- Live script state: animated green signal, no boring "status: ready" line.
+    -- Live script state: animated green signal.
     local statusDock = New("Frame", {
         AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 14),
         Size = UDim2.fromOffset(142, 30), BackgroundTransparency = 0.80, Parent = hero
@@ -1036,10 +1327,45 @@ local function createHomeDashboard(win, tab)
     statusValue.Size = UDim2.new(1, -32, 0, 18)
     statusValue.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Expanded stats row: current game, server population, session timer.
+    local stats = New("Frame", {
+        Position = UDim2.fromOffset(18, 88), Size = UDim2.new(1, -36, 0, 36),
+        BackgroundTransparency = 1, Parent = hero
+    })
+    New("UIGridLayout", {
+        CellSize = UDim2.new(1 / 3, -6, 1, 0), CellPadding = UDim2.fromOffset(9, 0),
+        SortOrder = Enum.SortOrder.LayoutOrder, Parent = stats
+    })
+    local function statChip(order, caption, value)
+        local chip = New("Frame", { LayoutOrder = order, BackgroundTransparency = 0.35, Parent = stats })
+        bind(win, chip, "BackgroundColor3", "Element")
+        corner(chip, 10)
+        stroke(win, chip, "Stroke")
+        local cap = label(win, chip, caption, 8, "SubText", FONT_BOLD)
+        cap.Position = UDim2.fromOffset(10, 4); cap.Size = UDim2.new(1, -20, 0, 10)
+        local val = label(win, chip, value, 12, "Text", FONT_BOLD)
+        val.Position = UDim2.fromOffset(10, 16); val.Size = UDim2.new(1, -20, 0, 16)
+        return val
+    end
+    local gameVal = statChip(1, "GAME", win._gameName or "Loading...")
+    local playersVal = statChip(2, "SERVER", "-")
+    local sessionVal = statChip(3, "SESSION", "00:00")
+    win._homeGameLbl = gameVal
+
+    local startedAt = os.clock()
+    task.spawn(function()
+        while hero.Parent do
+            local t = math.floor(os.clock() - startedAt)
+            sessionVal.Text = string.format("%02d:%02d", math.floor(t / 60), t % 60)
+            playersVal.Text = tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers)
+            task.wait(1)
+        end
+    end)
+
     -- Player profile dock. The image is the actual Roblox HeadShot thumbnail.
     local playerDock = New("Frame", {
         AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 18, 1, -13),
-        Size = UDim2.new(0.72, 0, 0, 48), BackgroundTransparency = 1, Parent = hero
+        Size = UDim2.new(1, -36, 0, 48), BackgroundTransparency = 1, Parent = hero
     })
 
     local avatar = New("ImageLabel", {
@@ -1051,16 +1377,17 @@ local function createHomeDashboard(win, tab)
     stroke(win, avatar, "Accent", 1)
 
     local playerName = label(win, playerDock, display, 14, "Text", FONT_BOLD)
-    playerName.Position = UDim2.fromOffset(61, 0)
-    playerName.Size = UDim2.new(1, -180, 0, 19)
+    playerName.Position = UDim2.fromOffset(61, 5)
+    playerName.Size = UDim2.new(1, -190, 0, 19)
     playerName.TextTruncate = Enum.TextTruncate.AtEnd
 
     local username = player and player.Name or "Unknown"
     local playerUser = label(win, playerDock, "@" .. username, 10, "SubText")
-    playerUser.Position = UDim2.fromOffset(61, 20)
-    playerUser.Size = UDim2.new(1, -180, 0, 15)
+    playerUser.Position = UDim2.fromOffset(61, 25)
+    playerUser.Size = UDim2.new(1, -190, 0, 15)
     playerUser.TextTruncate = Enum.TextTruncate.AtEnd
 
+    -- Premium / Freemium placeholder pill.
     local planPill = New("Frame", {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
         Size = UDim2.fromOffset(112, 28), BackgroundTransparency = 0.78, Parent = playerDock
@@ -1073,7 +1400,7 @@ local function createHomeDashboard(win, tab)
     })
     bind(win, planDot, "BackgroundColor3", "Accent")
     corner(planDot, 3)
-    local planValue = label(win, planPill, win._playerPlan, 9, "Text", FONT_BOLD)
+    local planValue = label(win, planPill, string.upper(win._playerPlan), 9, "Text", FONT_BOLD)
     planValue.Position = UDim2.fromOffset(23, 0)
     planValue.Size = UDim2.new(1, -30, 1, 0)
     planValue.TextXAlignment = Enum.TextXAlignment.Left
@@ -1142,20 +1469,24 @@ Library.Elements = {
     Button = CreateButton, Toggle = CreateToggle, Slider = CreateSlider, Input = CreateInput,
     Dropdown = CreateDropdown, Keybind = CreateKeybind, ColorPicker = CreateColorPicker,
     Section = CreateSection, Label = CreateLabel, Paragraph = CreateParagraph, Divider = CreateDivider,
+    FeatureCard = CreateFeatureCard, FastKeys = CreateFastKeys, SupportedGames = CreateSupportedGames,
 }
 
-function Tab:Button(o)      return CreateButton(self, o) end
-function Tab:Toggle(o)      return CreateToggle(self, o) end
-function Tab:Slider(o)      return CreateSlider(self, o) end
-function Tab:Input(o)       return CreateInput(self, o) end
-function Tab:Dropdown(o)    return CreateDropdown(self, o) end
-function Tab:Keybind(o)     return CreateKeybind(self, o) end
-function Tab:ColorPicker(o) return CreateColorPicker(self, o) end
-function Tab:Section(t)     return CreateSection(self, t) end
-function Tab:Label(t)       return CreateLabel(self, t) end
-function Tab:Paragraph(o)   return CreateParagraph(self, o) end
-function Tab:Divider()      return CreateDivider(self) end
-function Tab:Select()       self.Window:_select(self) end
+function Tab:Button(o)         return CreateButton(self, o) end
+function Tab:Toggle(o)         return CreateToggle(self, o) end
+function Tab:Slider(o)         return CreateSlider(self, o) end
+function Tab:Input(o)          return CreateInput(self, o) end
+function Tab:Dropdown(o)       return CreateDropdown(self, o) end
+function Tab:Keybind(o)        return CreateKeybind(self, o) end
+function Tab:ColorPicker(o)    return CreateColorPicker(self, o) end
+function Tab:Section(t)        return CreateSection(self, t) end
+function Tab:Label(t)          return CreateLabel(self, t) end
+function Tab:Paragraph(o)      return CreateParagraph(self, o) end
+function Tab:Divider()         return CreateDivider(self) end
+function Tab:FeatureCard(o)    return CreateFeatureCard(self, o) end
+function Tab:FastKeys(o)       return CreateFastKeys(self, o) end
+function Tab:SupportedGames(o) return CreateSupportedGames(self, o) end
+function Tab:Select()          self.Window:_select(self) end
 
 local function mergeTheme(t)
     local out = {}
@@ -1166,7 +1497,9 @@ end
 
 --[[
     Library:CreateWindow{
-        Title, SubTitle, Theme ("Dark" | table), Size (UDim2), ToggleKey (Enum.KeyCode)
+        Title ("Nova Hub"), SubTitle (optional, appended after game name), GameName (optional override),
+        Theme ("Dark" | table), Size (UDim2), ToggleKey (Enum.KeyCode),
+        Snow (bool, default true), SnowCount (number), ScriptStatus, PlayerPlan
     }
 ]]
 function Library:CreateWindow(opts)
@@ -1179,6 +1512,9 @@ function Library:CreateWindow(opts)
         _bound = {}, _themeCbs = {}, _conns = {}, _active = nil, _toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift,
         _scriptStatus = opts.ScriptStatus or "Operational",
         _playerPlan = opts.PlayerPlan or "Freemium",
+        _gameName = opts.GameName or game.Name or "Unknown Game",
+        _subTitle = opts.SubTitle,
+        _navOrder = 0,
     }, Window)
 
     local gui = New("ScreenGui", {
@@ -1213,8 +1549,8 @@ function Library:CreateWindow(opts)
         end
     end)
 
-    -- top bar
-    local top = New("Frame", { Size = UDim2.new(1, 0, 0, 46), Parent = main })
+    -- top bar (larger Nova Hub header: title + version pill, game name underneath)
+    local top = New("Frame", { Size = UDim2.new(1, 0, 0, TOP_H), Parent = main })
     bind(win, top, "BackgroundColor3", "Surface")
     corner(top, 12)
     -- filler squares off the bottom corners so only the top ones stay round
@@ -1224,7 +1560,7 @@ function Library:CreateWindow(opts)
     bind(win, topLine, "BackgroundColor3", "Stroke")
 
     local dot = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), Size = UDim2.fromOffset(10, 10), Parent = top })
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0, 21), Size = UDim2.fromOffset(10, 10), Parent = top })
     bind(win, dot, "BackgroundColor3", "Accent"); corner(dot, 5)
     local dotGlow = glow(win, dot, 4, 0.72)
     task.spawn(function()
@@ -1236,14 +1572,17 @@ function Library:CreateWindow(opts)
             task.wait(0.75)
         end
     end)
-    -- compact brand row: title -> version -> subtitle, with fixed bounds so nothing overlaps
-    local title = label(win, top, opts.Title or "NovaUI", 15, "Text", FONT_BOLD)
-    title.Position = UDim2.fromOffset(34, 0)
-    title.Size = UDim2.fromOffset(112, 46)
-    title.TextTruncate = Enum.TextTruncate.AtEnd
 
+    local titleText = opts.Title or "Nova Hub"
+    local titleMeasure = TextService:GetTextSize(titleText, 19, FONT_BOLD, Vector2.new(260, 30))
+    local titleW = math.min(titleMeasure.X + 4, 200)
+    local title = label(win, top, titleText, 19, "Text", FONT_BOLD)
+    title.Position = UDim2.fromOffset(34, 9)
+    title.Size = UDim2.fromOffset(titleW, 24)
+
+    -- the one and only version display
     local versionPill = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 152, 0.5, 0),
+        Position = UDim2.fromOffset(34 + titleW + 8, 12),
         Size = UDim2.fromOffset(50, 19), BackgroundTransparency = 0.84, Parent = top })
     bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
     local versionText = label(win, versionPill, "v." .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
@@ -1251,11 +1590,20 @@ function Library:CreateWindow(opts)
     versionText.TextXAlignment = Enum.TextXAlignment.Center
     versionText.TextYAlignment = Enum.TextYAlignment.Center
 
-    if opts.SubTitle then
-        local sub = label(win, top, opts.SubTitle, 11, "SubText")
-        sub.Position = UDim2.fromOffset(214, 0)
-        sub.Size = UDim2.new(0, 150, 1, 0)
-        sub.TextTruncate = Enum.TextTruncate.AtEnd
+    -- game name row
+    local gameLbl = label(win, top, "", 11, "SubText")
+    gameLbl.Position = UDim2.fromOffset(34, 34)
+    gameLbl.Size = UDim2.new(1, -130, 0, 16)
+    win._gameLbl = gameLbl
+    win:_applyGameName()
+
+    if not opts.GameName then
+        task.spawn(function()
+            local ok, info = pcall(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
+            if ok and info and info.Name and info.Name ~= "" and win.Gui and win.Gui.Parent then
+                win:SetGameName(info.Name)
+            end
+        end)
     end
 
     local function topButton(text, xOff, hoverKey)
@@ -1301,7 +1649,7 @@ function Library:CreateWindow(opts)
 
     -- sidebar
     local side = New("Frame", {
-        Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 164, 1, -46), Parent = main })
+        Position = UDim2.fromOffset(0, TOP_H), Size = UDim2.new(0, 164, 1, -TOP_H), Parent = main })
     bind(win, side, "BackgroundColor3", "Surface")
     side.BackgroundTransparency = 0.26
     corner(side, 14)
@@ -1325,9 +1673,14 @@ function Library:CreateWindow(opts)
 
     -- content
     local content = New("Frame", {
-        Position = UDim2.fromOffset(164, 46), Size = UDim2.new(1, -164, 1, -46),
+        Position = UDim2.fromOffset(164, TOP_H), Size = UDim2.new(1, -164, 1, -TOP_H),
         BackgroundTransparency = 1, ClipsDescendants = true, Parent = main })
     win.Content = content
+
+    -- snowflake GFX layer (decorative, never blocks input)
+    if opts.Snow ~= false then
+        createSnow(win, main, opts.SnowCount or 18)
+    end
 
     -- notifications (fixed-size holder: no AutomaticSize, so nothing can jitter)
     win._notifyHolder = New("Frame", { BackgroundTransparency = 1, Active = false, Name = "Notifications", Parent = gui })
@@ -1345,6 +1698,26 @@ function Library:CreateWindow(opts)
 
     table.insert(Library.Windows, win)
     return win
+end
+
+function Window:_applyGameName()
+    local text = tostring(self._gameName or "Unknown Game")
+    local header = self._subTitle and (text .. "  |  " .. tostring(self._subTitle)) or text
+    if self._gameLbl and self._gameLbl.Parent then self._gameLbl.Text = header end
+    if self._homeGameLbl and self._homeGameLbl.Parent then self._homeGameLbl.Text = text end
+end
+
+function Window:SetGameName(name)
+    self._gameName = tostring(name or "Unknown Game")
+    self:_applyGameName()
+end
+
+function Window:GetGameName()
+    return self._gameName
+end
+
+function Window:SetSnow(on)
+    if self._snow then self._snow.Visible = on and true or false end
 end
 
 function Window:Toggle()
@@ -1384,7 +1757,7 @@ end
 
 function Window:SetPlayerPlan(text)
     self._playerPlan = tostring(text or "Freemium")
-    if self._mainPlan then self._mainPlan.Text = self._playerPlan end
+    if self._mainPlan then self._mainPlan.Text = string.upper(self._playerPlan) end
 end
 
 function Window:GetPlayerPlan()
@@ -1459,15 +1832,26 @@ function Window:_select(tab)
     self._active = tab
 end
 
---[[ Window:Tab{ Title, Icon (asset id OR emoji/symbol, optional), Badge (optional) } ]]
+--[[ Window:Tab{ Title, Icon (asset id OR emoji/symbol OR native kind, optional), Badge (optional), Group (optional sidebar header) } ]]
 function Window:Tab(opts)
     opts = opts or {}
     local win = self
     local tab = setmetatable({ Window = win }, Tab)
 
+    -- sidebar group header (tab organisation)
+    win._navOrder += 1
+    if opts.Group and opts.Group ~= win._lastGroup then
+        win._lastGroup = opts.Group
+        local gl = label(win, win.TabList, string.upper(tostring(opts.Group)), 9, "SubText", FONT_BOLD)
+        gl.Size = UDim2.new(1, 0, 0, 18)
+        gl.LayoutOrder = win._navOrder
+        pad(gl, 4, 0, 0, 0)
+        win._navOrder += 1
+    end
+
     local btn = New("TextButton", {
         Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 32),
-        BackgroundTransparency = 1, LayoutOrder = #win.Tabs + 1, Parent = win.TabList })
+        BackgroundTransparency = 1, LayoutOrder = win._navOrder, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
     corner(btn, 9)
@@ -1535,7 +1919,7 @@ function Window:Tab(opts)
     page.ScrollBarImageColor3 = win.Theme.Accent
     table.insert(win._bound, { page, "ScrollBarImageColor3", "Accent" })
     pad(page, 16, 16, 16, 16)
-    New("UIListLayout", { Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
+    New("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
 
     tab._btn, tab._label, tab._indicator, tab.Page = btn, lbl, ind, page
     tab._icon, tab._iconBubble, tab._iconScale, tab._tabGlow = iconInst, iconBubble, iconScale, tabGlow
@@ -1586,6 +1970,56 @@ function Window:Tab(opts)
     end
 
     if #win.Tabs == 1 then win:_select(tab) end
+    return tab
+end
+
+--[[
+    Window:MiscTab{ Title ("Misc"), Group ("Hub"), FastKeys = { Title, Description, Keys = {...} } }
+    New Misc tab: Fast Keys card + a few utilities. Returns the tab so you can add more.
+]]
+function Window:MiscTab(opts)
+    opts = opts or {}
+    local win = self
+    local tab = win:Tab({ Title = opts.Title or "Misc", Icon = opts.Icon, Group = opts.Group or "Hub" })
+
+    local fk = opts.FastKeys or {}
+    tab:FastKeys({
+        Title = fk.Title or "Fast Keys",
+        Description = fk.Description or "Click a key to rebind it. Backspace clears, Escape cancels.",
+        Keys = fk.Keys or {},
+    })
+
+    tab:Section("Utilities")
+    tab:Button({
+        Title = "Copy Place ID", Description = "Copies this game's Place ID to your clipboard.", Icon = "misc",
+        Callback = function()
+            local ok = pcall(function() setclipboard(tostring(game.PlaceId)) end)
+            win:Notify({
+                Title = ok and "Copied" or "Clipboard unavailable",
+                Content = ok and ("Place ID " .. tostring(game.PlaceId) .. " copied.") or "Your executor has no setclipboard.",
+                Type = ok and "Success" or "Warning", Duration = 2.4,
+            })
+        end,
+    })
+    tab:Button({
+        Title = "Rejoin Server", Description = "Teleports you back into this same server.", Icon = "movement",
+        Callback = function()
+            pcall(function()
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
+            end)
+        end,
+    })
+    return tab
+end
+
+--[[
+    Window:SupportedGamesTab{ Title ("Supported Games"), Group ("Hub"), Games = { {Name, PlaceId, Status, Note}, ... } }
+]]
+function Window:SupportedGamesTab(opts)
+    opts = opts or {}
+    local tab = self:Tab({ Title = opts.Title or "Supported Games", Icon = opts.Icon, Group = opts.Group or "Hub" })
+    tab:Section("Supported Games")
+    tab:SupportedGames({ Games = opts.Games or {} })
     return tab
 end
 
