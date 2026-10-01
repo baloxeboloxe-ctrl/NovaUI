@@ -1620,114 +1620,221 @@ end
         Snow (bool, default true), SnowCount (number), ScriptStatus, PlayerPlan
     }
 ]]
-function Library:CreateWindow(opts)
-    opts = opts or {}
-    local themeName = type(opts.Theme) == "string" and opts.Theme or "Dark"
-    local theme = type(opts.Theme) == "table" and opts.Theme or self.Themes[themeName] or self.Themes.Dark
+--------------------------------------------------------------------------
+-- NOVA CUSTOM WINDOW ICON SUPPORT
+-- Does NOT modify Novalib.lua.
+--
+-- Supports:
+--   Icon = "rbxassetid://123456789"
+--   Icon = "123456789"
+--   Icon = "rbxthumb://type=GameIcon&id=5595353122&w=150&h=150"
+--
+-- Optional:
+--   IconSize = 30
+--   IconCornerRadius = 9
+--------------------------------------------------------------------------
 
-    local win = setmetatable({
-        Theme = mergeTheme(theme), Flags = {}, Tabs = {},
-        _bound = {}, _themeCbs = {}, _conns = {}, _active = nil, _toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift,
-        _scriptStatus = opts.ScriptStatus or "Operational",
-        _playerPlan = opts.PlayerPlan or "Freemium",
-        _gameName = opts.GameName or game.Name or "Unknown Game",
-        _subTitle = opts.SubTitle,
-        _navOrder = 0,
-    }, Window)
+do
+    local BaseCreateWindow = Library.CreateWindow
 
-    local gui = New("ScreenGui", {
-        Name = "NovaUI_" .. tostring(math.random(1000, 9999)), ResetOnSpawn = false,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999, IgnoreGuiInset = true })
-    mountGui(gui)
-    win.Gui = gui
+    Library.CreateWindow = function(self, opts)
+        opts = opts or {}
 
-    local size = opts.Size or UDim2.fromOffset(620, 430)
-    local main = New("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = size, ClipsDescendants = true, Parent = gui })
-    bind(win, main, "BackgroundColor3", "Background")
-    corner(main, 16); stroke(win, main, "Stroke")
-    glow(win, main, 5, 0.91)
-    local mainGradient = New("UIGradient", { Rotation = 35, Parent = main })
-    mainGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, win.Theme.Background:Lerp(win.Theme.Accent, 0.06)),
-        ColorSequenceKeypoint.new(0.55, win.Theme.Background),
-        ColorSequenceKeypoint.new(1, win.Theme.Background:Lerp(win.Theme.Accent, 0.03)),
-    })
-    local scale = New("UIScale", { Scale = 0.92, Parent = main })
-    tw(scale, { Scale = 1 }, 0.3, Enum.EasingStyle.Back)
-    win.Main = main
-    task.spawn(function()
-        while main.Parent do
-            tw(mainGradient, { Rotation = 125 }, 5.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(5.5)
-            if not main.Parent then break end
-            tw(mainGradient, { Rotation = 35 }, 5.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(5.5)
+        -- Copy options so we don't mutate the user's table.
+        local newOpts = {}
+
+        for k, v in pairs(opts) do
+            newOpts[k] = v
         end
-    end)
 
-    -- top bar (larger Nova Hub header: title + version pill, game name underneath)
-    local top = New("Frame", { Size = UDim2.new(1, 0, 0, TOP_H), Parent = main })
-    bind(win, top, "BackgroundColor3", "Surface")
-    corner(top, 12)
-    -- filler squares off the bottom corners so only the top ones stay round
-    local topFill = New("Frame", { Position = UDim2.new(0, 0, 1, -12), Size = UDim2.new(1, 0, 0, 12), Parent = top })
-    bind(win, topFill, "BackgroundColor3", "Surface")
-    local topLine = New("Frame", { Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), Parent = top })
-    bind(win, topLine, "BackgroundColor3", "Stroke")
+        local win = BaseCreateWindow(self, newOpts)
 
-    local hubIcon = New("ImageLabel", {
-        Name = "HubIcon",
-        AnchorPoint = Vector2.new(0,0.5),
-        Position = UDim2.new(0,12,0,21),
-        Size = UDim2.fromOffset(24,24),
-        BackgroundTransparency = 1,
-        Image = opts.Icon or "" ,
-        Parent = top })
-    corner(hubIcon, 8)
-    task.spawn(function()
-        while dot.Parent do
-            tw(dotGlow, { Transparency = 0.42 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(0.75)
-            if not dot.Parent then break end
-            tw(dotGlow, { Transparency = 0.86 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(0.75)
-        end
-    end)
+        ------------------------------------------------------------------
+        -- Find the existing header icon created by NovaUI.
+        ------------------------------------------------------------------
+        local hubIcon = win.Main and win.Main:FindFirstChild("HubIcon", true)
 
-    local titleText = opts.Title or "Nova Hub"
-    local titleMeasure = TextService:GetTextSize(titleText, 19, FONT_BOLD, Vector2.new(260, 30))
-    local titleW = math.min(titleMeasure.X + 4, 200)
-    local title = label(win, top, titleText, 19, "Text", FONT_BOLD)
-    title.Position = UDim2.fromOffset(44, 9)
-    title.Size = UDim2.fromOffset(titleW, 24)
+        if hubIcon then
+            local hasIcon =
+                type(opts.Icon) == "string"
+                and opts.Icon ~= ""
 
-    -- the one and only version display
-    local versionPill = New("Frame", {
-        Position = UDim2.fromOffset(34 + titleW + 8, 12),
-        Size = UDim2.fromOffset(50, 19), BackgroundTransparency = 0.84, Parent = top })
-    bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
-    local versionText = label(win, versionPill, "v." .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
-    versionText.Size = UDim2.fromScale(1, 1)
-    versionText.TextXAlignment = Enum.TextXAlignment.Center
-    versionText.TextYAlignment = Enum.TextYAlignment.Center
+            ----------------------------------------------------------------
+            -- No icon:
+            -- remove the icon completely and reclaim the space.
+            ----------------------------------------------------------------
+            if not hasIcon then
+                hubIcon.Visible = false
 
-    -- game name row
-    local gameLbl = label(win, top, "", 11, "SubText")
-    gameLbl.Position = UDim2.fromOffset(34, 34)
-    gameLbl.Size = UDim2.new(1, -130, 0, 16)
-    win._gameLbl = gameLbl
-    win:_applyGameName()
+            ----------------------------------------------------------------
+            -- Icon supplied:
+            ----------------------------------------------------------------
+            else
+                hubIcon.Visible = true
 
-    if not opts.GameName then
-        task.spawn(function()
-            local ok, info = pcall(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
-            if ok and info and info.Name and info.Name ~= "" and win.Gui and win.Gui.Parent then
-                win:SetGameName(info.Name)
+                ------------------------------------------------------------
+                -- Accept plain numeric Roblox asset IDs.
+                ------------------------------------------------------------
+                local icon = opts.Icon
+
+                if icon:match("^%d+$") then
+                    icon = "rbxassetid://" .. icon
+                end
+
+                hubIcon.Image = icon
+
+                ------------------------------------------------------------
+                -- User-configurable size.
+                ------------------------------------------------------------
+                local iconSize = tonumber(opts.IconSize) or 24
+
+                iconSize = math.clamp(iconSize, 14, 40)
+
+                hubIcon.Size = UDim2.fromOffset(iconSize, iconSize)
+
+                ------------------------------------------------------------
+                -- Center icon vertically in header.
+                ------------------------------------------------------------
+                hubIcon.Position = UDim2.new(
+                    0,
+                    12,
+                    0.5,
+                    0
+                )
+
+                hubIcon.AnchorPoint = Vector2.new(0, 0.5)
+
+                ------------------------------------------------------------
+                -- Rounded icon.
+                ------------------------------------------------------------
+                local corner = hubIcon:FindFirstChildOfClass("UICorner")
+
+                if corner then
+                    corner.CornerRadius = UDim.new(
+                        0,
+                        math.clamp(
+                            tonumber(opts.IconCornerRadius) or 8,
+                            0,
+                            math.floor(iconSize / 2)
+                        )
+                    )
+                end
             end
-        end)
+
+            ----------------------------------------------------------------
+            -- Fix title positioning.
+            --
+            -- Existing NovaUI title is hardcoded to X = 44.
+            ----------------------------------------------------------------
+            local title
+
+            for _, child in ipairs(win.Main:GetDescendants()) do
+                if child:IsA("TextLabel")
+                    and child.Text == tostring(opts.Title or "Nova Hub")
+                then
+                    title = child
+                    break
+                end
+            end
+
+            if title then
+                if hasIcon then
+                    local iconSize = math.clamp(
+                        tonumber(opts.IconSize) or 24,
+                        14,
+                        40
+                    )
+
+                    title.Position = UDim2.fromOffset(
+                        12 + iconSize + 10,
+                        9
+                    )
+                else
+                    title.Position = UDim2.fromOffset(
+                        16,
+                        9
+                    )
+                end
+            end
+        end
+
+        -- Store the icon configuration on the window so you can
+        -- change it later without recreating the UI.
+        win.Icon = opts.Icon
+        win.IconSize = tonumber(opts.IconSize) or 24
+
+        ------------------------------------------------------------------
+        -- Runtime icon changer.
+        --
+        -- Example:
+        -- Window:SetIcon("123456789")
+        ------------------------------------------------------------------
+        function win:SetIcon(icon, size)
+            local obj = self.Main
+                and self.Main:FindFirstChild("HubIcon", true)
+
+            if not obj then
+                return
+            end
+
+            if type(icon) ~= "string" or icon == "" then
+                obj.Visible = false
+                self.Icon = nil
+                return
+            end
+
+            if icon:match("^%d+$") then
+                icon = "rbxassetid://" .. icon
+            end
+
+            local iconSize = math.clamp(
+                tonumber(size) or self.IconSize or 24,
+                14,
+                40
+            )
+
+            obj.Visible = true
+            obj.Image = icon
+            obj.Size = UDim2.fromOffset(iconSize, iconSize)
+            obj.Position = UDim2.new(0, 12, 0.5, 0)
+
+            local corner = obj:FindFirstChildOfClass("UICorner")
+
+            if corner then
+                corner.CornerRadius = UDim.new(
+                    0,
+                    math.clamp(
+                        math.floor(iconSize * 0.30),
+                        0,
+                        math.floor(iconSize / 2)
+                    )
+                )
+            end
+
+            self.Icon = icon
+            self.IconSize = iconSize
+
+            -- Update title position.
+            local titleText = tostring(
+                self._titleText or opts.Title or "Nova Hub"
+            )
+
+            for _, child in ipairs(self.Main:GetDescendants()) do
+                if child:IsA("TextLabel")
+                    and child.Text == titleText
+                then
+                    child.Position = UDim2.fromOffset(
+                        12 + iconSize + 10,
+                        9
+                    )
+                    break
+                end
+            end
+        end
+
+        return win
     end
+end
 
     local function topButton(text, xOff, hoverKey)
         local b = New("TextButton", {
