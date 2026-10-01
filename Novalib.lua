@@ -1260,26 +1260,31 @@ local function CreateSupportedGames(tab, opts)
         stroke(win, row, isCurrent and "Success" or "Stroke")
         glow(win, row, 3, 0.96)
 
-        local chip = New("Frame", {
+        local chip = New("ImageLabel", {
+            Name = "GameIcon",
             AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0),
-            Size = UDim2.fromOffset(42, 42), BackgroundTransparency = 0, Parent = row })
-        bind(win, chip, "BackgroundColor3", "Accent")
+            Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 0.86,
+            Image = "", Parent = row })
         corner(chip, 10)
+        task.spawn(function()
+            local ok, body = pcall(function()
+                return game:HttpGet("https://thumbnails.roblox.com/v1/places/icons?placeIds=" .. tostring(g.PlaceId or 0) .. "&size=150x150&format=Png&isCircular=false")
+            end)
+            if ok then
+                local ok2, data = pcall(function()
+                    return game:GetService("HttpService"):JSONDecode(body)
+                end)
+                if ok2 and data and data.data and data.data[1] and data.data[1].imageUrl then
+                    chip.Image = data.data[1].imageUrl
+                end
+            end
+        end)
 
-        local icon = New("ImageLabel", {
-            BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 1),
-            Image = (g.PlaceId and ("rbxthumb://type=GameIcon&id=" .. tostring(g.PlaceId) .. "&w=150&h=150")) or "",
-            ScaleType = Enum.ScaleType.Crop,
-            Parent = chip
-        })
-        corner(icon, 10)
-
-        local reserve = 14 + 42 + 12 + 92 + 14 + (isCurrent and 76 or 0)
+        local reserve = 14 + 32 + 12 + 92 + 14 + (isCurrent and 76 or 0)
         local name = label(win, row, tostring(g.Name or "Unknown"), 14, "Text", FONT_BOLD)
-        name.Position = UDim2.fromOffset(68, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
+        name.Position = UDim2.fromOffset(58, 11); name.Size = UDim2.new(1, -reserve, 0, 18)
         local note = label(win, row, g.Note or (g.PlaceId and ("Place ID: " .. tostring(g.PlaceId)) or ""), 12, "SubText")
-        note.Position = UDim2.fromOffset(68, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
+        note.Position = UDim2.fromOffset(58, 30); note.Size = UDim2.new(1, -reserve, 0, 14)
 
         local pill = New("Frame", {
             AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
@@ -1557,6 +1562,37 @@ Library.Elements = {
     Section = CreateSection, Label = CreateLabel, Paragraph = CreateParagraph, Divider = CreateDivider,
     FeatureCard = CreateFeatureCard, FastKeys = CreateFastKeys, SupportedGames = CreateSupportedGames,
 }
+
+
+
+-- v9 layout extensions: screenshot-style cards and collapsible groups
+local function CreateCard(tab, opts)
+    opts = opts or {}
+    local frame = New("Frame", {
+        Size = UDim2.new(1, 0, 0, opts.Height or 120),
+        BackgroundColor3 = tab.Window.Theme.Surface,
+        BorderSizePixel = 0,
+        Parent = tab.Content or tab._content or tab.Window.Content
+    })
+    corner(frame, 14)
+    local title = label(tab.Window, frame, string.upper(opts.Title or "SECTION"), 11, "Text", FONT_BOLD)
+    title.Position = UDim2.fromOffset(16, 10)
+    title.Size = UDim2.new(1,-32,0,22)
+    local line = New("Frame", {Size=UDim2.new(1,-32,0,1), Position=UDim2.fromOffset(16,36), BackgroundColor3=tab.Window.Theme.Border, BorderSizePixel=0, Parent=frame})
+    local card = {Frame=frame, Tab=tab}
+    function card:Label(text, desc)
+        local y = #frame:GetChildren()*22 + 35
+        local l = label(tab.Window, frame, text, 14, "Text", FONT_REG)
+        l.Position=UDim2.fromOffset(16,y)
+        if desc then
+            local d=label(tab.Window, frame, desc, 12, "SubText", FONT_REG)
+            d.Position=UDim2.fromOffset(16,y+18)
+        end
+    end
+    return card
+end
+
+Tab.Card = CreateCard
 
 function Tab:Button(o)         return CreateButton(self, o) end
 function Tab:Toggle(o)         return CreateToggle(self, o) end
@@ -1928,15 +1964,15 @@ function Window:Tab(opts)
     win._navOrder += 1
     if opts.Group and opts.Group ~= win._lastGroup then
         win._lastGroup = opts.Group
-        local gl = label(win, win.TabList, string.upper(tostring(opts.Group)), 9, "SubText", FONT_BOLD)
-        gl.Size = UDim2.new(1, 0, 0, 20)
+        local gl = label(win, win.TabList, "▼  " .. string.upper(tostring(opts.Group)), 10, "SubText", FONT_BOLD)
+        gl.Size = UDim2.new(1, 0, 0, 30)
         gl.LayoutOrder = win._navOrder
         pad(gl, 8, 4, 0, 0)
         win._navOrder += 1
     end
 
     local btn = New("TextButton", {
-        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 36),
+        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 30),
         BackgroundTransparency = 1, LayoutOrder = win._navOrder, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
