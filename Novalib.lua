@@ -891,6 +891,10 @@ function Library:CreateWindow(opts)
     -- top bar
     local top = New("Frame", { Size = UDim2.new(1, 0, 0, 46), Parent = main })
     bind(win, top, "BackgroundColor3", "Surface")
+    corner(top, 12)
+    -- filler squares off the bottom corners so only the top ones stay round
+    local topFill = New("Frame", { Position = UDim2.new(0, 0, 1, -12), Size = UDim2.new(1, 0, 0, 12), Parent = top })
+    bind(win, topFill, "BackgroundColor3", "Surface")
     local topLine = New("Frame", { Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), Parent = top })
     bind(win, topLine, "BackgroundColor3", "Stroke")
 
@@ -953,6 +957,12 @@ function Library:CreateWindow(opts)
     local side = New("Frame", {
         Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 164, 1, -46), Parent = main })
     bind(win, side, "BackgroundColor3", "Surface")
+    corner(side, 12)
+    -- fillers square off the top and right corners; only bottom-left stays round (matches the window)
+    local sideFillTop = New("Frame", { Size = UDim2.new(1, 0, 0, 12), Parent = side })
+    bind(win, sideFillTop, "BackgroundColor3", "Surface")
+    local sideFillRight = New("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 12, 1, 0), Parent = side })
+    bind(win, sideFillRight, "BackgroundColor3", "Surface")
     local sideLine = New("Frame", { Position = UDim2.new(1, -1, 0, 0), Size = UDim2.new(0, 1, 1, 0), Parent = side })
     bind(win, sideLine, "BackgroundColor3", "Stroke")
     local tabList = New("ScrollingFrame", {
@@ -1020,10 +1030,10 @@ function Window:_select(tab)
     for _, t in ipairs(self.Tabs) do
         local on = t == tab
         t.Page.Visible = on
-        tw(t.Button, { BackgroundTransparency = on and 0.85 or 1 }, 0.15)
-        tw(t.Indicator, { BackgroundTransparency = on and 0 or 1, Size = UDim2.new(0, 3, 0, on and 16 or 6) }, 0.15)
-        t.Label.TextColor3 = on and self.Theme.Accent or self.Theme.SubText
-        if t.Icon then t.Icon.ImageColor3 = on and self.Theme.Accent or self.Theme.SubText end
+        tw(t._btn, { BackgroundTransparency = on and 0.85 or 1 }, 0.15)
+        tw(t._indicator, { BackgroundTransparency = on and 0 or 1, Size = UDim2.new(0, 3, 0, on and 16 or 6) }, 0.15)
+        t._label.TextColor3 = on and self.Theme.Accent or self.Theme.SubText
+        if t._icon then t._icon.ImageColor3 = on and self.Theme.Accent or self.Theme.SubText end
     end
     self._active = tab
 end
@@ -1051,7 +1061,7 @@ function Window:Tab(opts)
             Image = toImage(opts.Icon), BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 0.5),
             Position = UDim2.new(0, 14, 0.5, 0), Size = UDim2.fromOffset(18, 18),
             ImageColor3 = win.Theme.SubText, Parent = btn })
-        tab.Icon = ic
+        tab._icon = ic
         textOffset = 40
     end
     local lbl = New("TextLabel", {
@@ -1067,7 +1077,7 @@ function Window:Tab(opts)
     pad(page, 14, 14, 14, 14)
     New("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
 
-    tab.Button, tab.Label, tab.Indicator, tab.Page = btn, lbl, ind, page
+    tab._btn, tab._label, tab._indicator, tab.Page = btn, lbl, ind, page
     table.insert(win.Tabs, tab)
 
     btn.MouseEnter:Connect(function()
@@ -1081,7 +1091,7 @@ function Window:Tab(opts)
     onTheme(win, function()
         local on = win._active == tab
         lbl.TextColor3 = on and win.Theme.Accent or win.Theme.SubText
-        if tab.Icon then tab.Icon.ImageColor3 = on and win.Theme.Accent or win.Theme.SubText end
+        if tab._icon then tab._icon.ImageColor3 = on and win.Theme.Accent or win.Theme.SubText end
     end)
 
     if #win.Tabs == 1 then win:_select(tab) end
