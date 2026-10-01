@@ -1620,7 +1620,8 @@ end
         Snow (bool, default true), SnowCount (number), ScriptStatus, PlayerPlan
     }
 ]]
---------------------------------------------------------------------------
+function Library:CreateWindow(opts)
+    --------------------------------------------------------------------------
 -- NOVA CUSTOM WINDOW ICON SUPPORT
 -- Does NOT modify Novalib.lua.
 --
