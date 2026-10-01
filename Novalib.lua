@@ -191,36 +191,41 @@ end
 
 local function iconKindFor(title)
     local s = string.lower(tostring(title or ""))
-    if s:find("main") or s:find("home") or s:find("dashboard") then return "home" end
-    if s:find("player") then return "player" end
-    if s:find("aim") or s:find("combat") or s:find("target") then return "combat" end
-    if s:find("visual") or s:find("esp") or s:find("render") then return "visual" end
-    if s:find("movement") or s:find("speed") or s:find("fly") then return "movement" end
-    if s:find("setting") or s:find("config") then return "settings" end
-    if s:find("info") or s:find("about") then return "info" end
-    if s:find("script") or s:find("misc") then return "misc" end
+    if s == "main" then return "dashboard" end
+    if s == "home" or s:find("home", 1, true) then return "home" end
+    if s:find("dashboard", 1, true) then return "dashboard" end
+    if s:find("player", 1, true) then return "player" end
+    if s:find("aim", 1, true) or s:find("combat", 1, true) or s:find("target", 1, true) then return "combat" end
+    if s:find("visual", 1, true) or s:find("esp", 1, true) or s:find("render", 1, true) then return "visual" end
+    if s:find("movement", 1, true) or s:find("speed", 1, true) or s:find("fly", 1, true) then return "movement" end
+    if s:find("setting", 1, true) or s:find("config", 1, true) then return "settings" end
+    if s:find("info", 1, true) or s:find("about", 1, true) then return "info" end
+    if s:find("script", 1, true) or s:find("misc", 1, true) then return "misc" end
     return "misc"
 end
 
 local function newIconPart(parent, size, position, color, radius, rotation)
     local f = New("Frame", {
-        Size = size, Position = position, BackgroundColor3 = color, BackgroundTransparency = 0, Parent = parent })
+        Size = size, Position = position, BackgroundColor3 = color, BackgroundTransparency = 0, Parent = parent
+    })
     if radius then corner(f, radius) end
     if rotation then f.Rotation = rotation end
     return f
 end
 
 local function createNativeIcon(win, parent, kind)
-    local holder = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = parent })
+    local holder = New("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(16, 16), BackgroundTransparency = 1, Parent = parent
+    })
     holder:SetAttribute("NovaIconKind", kind)
-    local iconScale = New("UIScale", { Scale = 0.72, Parent = holder })
 
     local parts = {}
     local function part(size, pos, radius, rotation, strokeMode)
         local f = newIconPart(holder, size, pos, win.Theme.SubText, radius, rotation)
         table.insert(parts, f)
         if strokeMode then
-            local st = New("UIStroke", { Thickness = 1.7, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
+            local st = New("UIStroke", { Thickness = 1.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
             bind(win, st, "Color", "SubText")
         else
             bind(win, f, "BackgroundColor3", "SubText")
@@ -229,43 +234,51 @@ local function createNativeIcon(win, parent, kind)
     end
 
     if kind == "home" then
-        part(UDim2.fromOffset(10, 9), UDim2.fromOffset(9, 12), 2, 0)
-        part(UDim2.fromOffset(8, 6), UDim2.fromOffset(4, 8), 1, -45)
-        part(UDim2.fromOffset(8, 6), UDim2.fromOffset(12, 8), 1, 45)
-        part(UDim2.fromOffset(3, 5), UDim2.fromOffset(12, 16), 1, 0)
+        -- Small, centered house. No Unicode glyphs, no oversized diagonals.
+        part(UDim2.fromOffset(8, 7), UDim2.fromOffset(4, 7), 2, 0)
+        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(2, 5), 1, -35)
+        part(UDim2.fromOffset(6, 2), UDim2.fromOffset(8, 5), 1, 35)
+        part(UDim2.fromOffset(2, 4), UDim2.fromOffset(7, 10), 1, 0)
+    elseif kind == "dashboard" then
+        -- Compact 2x2 grid for Main/Dashboard.
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(1, 1), 1)
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(10, 1), 1)
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(1, 10), 1)
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(10, 10), 1)
     elseif kind == "player" then
-        part(UDim2.fromOffset(7, 7), UDim2.fromOffset(10, 4), 4, 0)
-        part(UDim2.fromOffset(13, 8), UDim2.fromOffset(7, 13), 6, 0)
+        part(UDim2.fromOffset(6, 6), UDim2.fromOffset(5, 1), 3, 0)
+        part(UDim2.fromOffset(10, 6), UDim2.fromOffset(3, 9), 4, 0)
     elseif kind == "visual" then
-        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        local ring = part(UDim2.fromOffset(15, 10), UDim2.fromOffset(0, 3), 5, 0, true)
         ring.BackgroundTransparency = 1
-        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(11, 11), 3, 0)
+        part(UDim2.fromOffset(4, 4), UDim2.fromOffset(6, 6), 2, 0)
     elseif kind == "combat" then
-        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        local ring = part(UDim2.fromOffset(15, 15), UDim2.fromOffset(0, 0), 8, 0, true)
         ring.BackgroundTransparency = 1
-        part(UDim2.fromOffset(3, 11), UDim2.fromOffset(12, 7), 1, 0)
-        part(UDim2.fromOffset(11, 3), UDim2.fromOffset(8, 12), 1, 0)
+        part(UDim2.fromOffset(2, 10), UDim2.fromOffset(7, 3), 1, 0)
+        part(UDim2.fromOffset(10, 2), UDim2.fromOffset(3, 7), 1, 0)
     elseif kind == "movement" then
-        part(UDim2.fromOffset(15, 3), UDim2.fromOffset(6, 12), 2, -45)
-        part(UDim2.fromOffset(8, 3), UDim2.fromOffset(5, 7), 2, 45)
-        part(UDim2.fromOffset(3, 12), UDim2.fromOffset(12, 7), 1, 0)
+        part(UDim2.fromOffset(10, 2), UDim2.fromOffset(3, 5), 1, -35)
+        part(UDim2.fromOffset(7, 2), UDim2.fromOffset(6, 10), 1, -35)
+        part(UDim2.fromOffset(2, 6), UDim2.fromOffset(11, 5), 1, 0)
     elseif kind == "settings" then
+        -- Deliberately preserve the settings shape from the prior working version.
         local gear = part(UDim2.fromOffset(11, 11), UDim2.fromOffset(8, 8), 3, 0, true)
         gear.BackgroundTransparency = 1
         part(UDim2.fromOffset(3, 15), UDim2.fromOffset(12, 6), 1, 0)
         part(UDim2.fromOffset(15, 3), UDim2.fromOffset(6, 12), 1, 0)
         part(UDim2.fromOffset(5, 5), UDim2.fromOffset(11, 11), 3, 0)
     elseif kind == "info" then
-        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        local ring = part(UDim2.fromOffset(15, 15), UDim2.fromOffset(0, 0), 8, 0, true)
         ring.BackgroundTransparency = 1
-        local i = label(win, holder, "i", 13, "SubText", FONT_BOLD)
+        local i = label(win, holder, "i", 11, "SubText", FONT_BOLD)
         i.Size = UDim2.fromScale(1, 1)
         i.TextXAlignment = Enum.TextXAlignment.Center
         i.TextYAlignment = Enum.TextYAlignment.Center
         table.insert(parts, i)
     else
-        part(UDim2.fromOffset(11, 11), UDim2.fromOffset(8, 8), 2, 45)
-        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(12, 12), 2, 0)
+        part(UDim2.fromOffset(10, 10), UDim2.fromOffset(3, 3), 2, 45)
+        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(6, 6), 2, 0)
     end
 
     local function setOn(on)
@@ -955,68 +968,163 @@ end
 --------------------------------------------------------------------------
 -- MAIN DASHBOARD
 --------------------------------------------------------------------------
-local function createMainDashboard(win, tab)
+local function createHomeDashboard(win, tab)
     local page = tab.Page
     local holder = New("Frame", {
-        Size = UDim2.new(1, 0, 0, 128), BackgroundTransparency = 1, LayoutOrder = -1000, Parent = page })
+        Size = UDim2.new(1, 0, 0, 148), BackgroundTransparency = 1, LayoutOrder = -1000, Parent = page
+    })
 
-    local statusCard = New("Frame", {
-        Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 0, Parent = holder })
-    bind(win, statusCard, "BackgroundColor3", "Surface")
-    corner(statusCard, 14); local statusStroke = stroke(win, statusCard, "Stroke", 1); glow(win, statusCard, 3, 0.90)
-    pad(statusCard, 14, 12, 14, 12)
+    -- One floating surface instead of two classic cards.
+    local hero = New("Frame", {
+        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 0.10, Parent = holder
+    })
+    bind(win, hero, "BackgroundColor3", "Surface")
+    corner(hero, 18)
+    local heroStroke = stroke(win, hero, "Stroke", 1)
+    local heroGlow = glow(win, hero, 4, 0.94)
 
-    local statusDot = New("Frame", { Position = UDim2.fromOffset(14, 15), Size = UDim2.fromOffset(9, 9), Parent = statusCard })
-    bind(win, statusDot, "BackgroundColor3", "Success"); corner(statusDot, 5)
-    local statusTitle = label(win, statusCard, "SCRIPT STATUS", 10, "SubText", FONT_BOLD)
-    statusTitle.Position = UDim2.fromOffset(31, 10); statusTitle.Size = UDim2.new(1, -45, 0, 15)
-    local statusValue = label(win, statusCard, win._scriptStatus, 18, "Text", FONT_BOLD)
-    statusValue.Position = UDim2.fromOffset(14, 32); statusValue.Size = UDim2.new(1, -28, 0, 24)
-    local statusDesc = label(win, statusCard, "Ready for feature initialization", 11, "SubText")
-    statusDesc.Position = UDim2.fromOffset(14, 63); statusDesc.Size = UDim2.new(1, -28, 0, 16)
-    local statusLine = New("Frame", { Position = UDim2.new(0, 14, 1, -12), Size = UDim2.new(1, -28, 0, 2), Parent = statusCard })
-    bind(win, statusLine, "BackgroundColor3", "Success"); corner(statusLine, 2)
+    local accentRail = New("Frame", {
+        Position = UDim2.fromOffset(0, 16), Size = UDim2.fromOffset(3, 116), Parent = hero
+    })
+    bind(win, accentRail, "BackgroundColor3", "Accent")
+    corner(accentRail, 2)
 
-    local playerCard = New("Frame", {
-        Position = UDim2.new(0.5, 5, 0, 0), Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 0, Parent = holder })
-    bind(win, playerCard, "BackgroundColor3", "Surface")
-    corner(playerCard, 14); glow(win, playerCard, 3, 0.90); pad(playerCard, 14, 12, 14, 12)
+    local kicker = label(win, hero, "NOVA / HOME", 9, "Accent", FONT_BOLD)
+    kicker.Position = UDim2.fromOffset(18, 14)
+    kicker.Size = UDim2.fromOffset(120, 14)
 
-    local avatar = New("Frame", { Position = UDim2.fromOffset(14, 15), Size = UDim2.fromOffset(38, 38), Parent = playerCard })
-    bind(win, avatar, "BackgroundColor3", "Accent"); corner(avatar, 19)
-    local avatarHead = New("Frame", { Position = UDim2.fromOffset(12, 7), Size = UDim2.fromOffset(14, 14), BackgroundColor3 = Color3.new(1,1,1), Parent = avatar })
-    corner(avatarHead, 7)
-    local avatarBody = New("Frame", { Position = UDim2.fromOffset(8, 22), Size = UDim2.fromOffset(22, 10), BackgroundColor3 = Color3.new(1,1,1), Parent = avatar })
-    corner(avatarBody, 6)
+    local welcome = label(win, hero, "Control center", 22, "Text", FONT_BOLD)
+    welcome.Position = UDim2.fromOffset(18, 31)
+    welcome.Size = UDim2.new(0.46, 0, 0, 28)
 
-    local playerTitle = label(win, playerCard, "PLAYER", 10, "SubText", FONT_BOLD)
-    playerTitle.Position = UDim2.fromOffset(62, 11); playerTitle.Size = UDim2.new(1, -76, 0, 15)
-    local playerName = label(win, playerCard, Players.LocalPlayer and Players.LocalPlayer.DisplayName or "Player", 15, "Text", FONT_BOLD)
-    playerName.Position = UDim2.fromOffset(62, 29); playerName.Size = UDim2.new(1, -76, 0, 20)
-    local playerUser = label(win, playerCard, "@" .. (Players.LocalPlayer and Players.LocalPlayer.Name or "Unknown"), 10, "SubText")
-    playerUser.Position = UDim2.fromOffset(62, 50); playerUser.Size = UDim2.new(1, -76, 0, 15)
+    local player = Players.LocalPlayer
+    local display = player and player.DisplayName or "Player"
+    local hint = label(win, hero, "Welcome back, " .. display, 11, "SubText")
+    hint.Position = UDim2.fromOffset(18, 61)
+    hint.Size = UDim2.new(0.46, 0, 0, 16)
+    hint.TextTruncate = Enum.TextTruncate.AtEnd
 
-    local planPill = New("Frame", { Position = UDim2.new(0, 14, 1, -42), Size = UDim2.new(1, -28, 0, 27), Parent = playerCard })
-    bind(win, planPill, "BackgroundColor3", "Accent"); planPill.BackgroundTransparency = 0.86; corner(planPill, 9)
-    local planLabel = label(win, planPill, "PLAN", 9, "Accent", FONT_BOLD)
-    planLabel.Position = UDim2.fromOffset(10, 0); planLabel.Size = UDim2.fromOffset(32, 27); planLabel.TextYAlignment = Enum.TextYAlignment.Center
-    local planValue = label(win, planPill, win._playerPlan, 10, "Text", FONT_BOLD)
-    planValue.Position = UDim2.fromOffset(45, 0); planValue.Size = UDim2.new(1, -55, 1, 0); planValue.TextXAlignment = Enum.TextXAlignment.Right
+    -- Live script state: animated green signal, no boring "status: ready" line.
+    local statusDock = New("Frame", {
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 14),
+        Size = UDim2.fromOffset(142, 30), BackgroundTransparency = 0.80, Parent = hero
+    })
+    bind(win, statusDock, "BackgroundColor3", "Success")
+    corner(statusDock, 15)
+    local statusDockGlow = glow(win, statusDock, 3, 0.84)
 
-    win._mainStatus = statusValue
-    win._mainStatusDot = statusDot
-    win._mainPlan = planValue
+    local statusDot = New("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
+        Size = UDim2.fromOffset(7, 7), Parent = statusDock
+    })
+    bind(win, statusDot, "BackgroundColor3", "Success")
+    corner(statusDot, 4)
+    local statusDotGlow = New("UIStroke", {
+        Thickness = 4, Transparency = 0.20, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = statusDot
+    })
+    bind(win, statusDotGlow, "Color", "Success")
 
-    local pulse = glow(win, statusCard, 5, 0.84)
-    task.spawn(function()
-        while statusCard.Parent do
-            tw(pulse, { Transparency = 0.58 }, 1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(1.0)
-            if not statusCard.Parent then break end
-            tw(pulse, { Transparency = 0.88 }, 1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(1.0)
+    onTheme(win, function()
+        if statusDotGlow.Parent then
+            statusDotGlow.Color = win.Theme.Success
         end
     end)
+
+    local statusValue = label(win, statusDock, win._scriptStatus, 10, "Text", FONT_BOLD)
+    statusValue.AnchorPoint = Vector2.new(0, 0.5)
+    statusValue.Position = UDim2.new(0, 25, 0.5, 0)
+    statusValue.Size = UDim2.new(1, -32, 0, 18)
+    statusValue.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Player profile dock. The image is the actual Roblox HeadShot thumbnail.
+    local playerDock = New("Frame", {
+        AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 18, 1, -13),
+        Size = UDim2.new(0.72, 0, 0, 48), BackgroundTransparency = 1, Parent = hero
+    })
+
+    local avatar = New("ImageLabel", {
+        Position = UDim2.fromOffset(0, 0), Size = UDim2.fromOffset(48, 48),
+        BackgroundColor3 = win.Theme.Element, BackgroundTransparency = 0.05,
+        Image = "", ScaleType = Enum.ScaleType.Crop, Parent = playerDock
+    })
+    corner(avatar, 24)
+    stroke(win, avatar, "Accent", 1)
+
+    local playerName = label(win, playerDock, display, 14, "Text", FONT_BOLD)
+    playerName.Position = UDim2.fromOffset(61, 0)
+    playerName.Size = UDim2.new(1, -180, 0, 19)
+    playerName.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local username = player and player.Name or "Unknown"
+    local playerUser = label(win, playerDock, "@" .. username, 10, "SubText")
+    playerUser.Position = UDim2.fromOffset(61, 20)
+    playerUser.Size = UDim2.new(1, -180, 0, 15)
+    playerUser.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local planPill = New("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.fromOffset(112, 28), BackgroundTransparency = 0.78, Parent = playerDock
+    })
+    bind(win, planPill, "BackgroundColor3", "Accent")
+    corner(planPill, 14)
+    local planDot = New("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
+        Size = UDim2.fromOffset(6, 6), Parent = planPill
+    })
+    bind(win, planDot, "BackgroundColor3", "Accent")
+    corner(planDot, 3)
+    local planValue = label(win, planPill, win._playerPlan, 9, "Text", FONT_BOLD)
+    planValue.Position = UDim2.fromOffset(23, 0)
+    planValue.Size = UDim2.new(1, -30, 1, 0)
+    planValue.TextXAlignment = Enum.TextXAlignment.Left
+    planValue.TextYAlignment = Enum.TextYAlignment.Center
+
+    local trace = New("Frame", {
+        Position = UDim2.new(0, 18, 1, -4), Size = UDim2.fromOffset(52, 2), Parent = hero
+    })
+    bind(win, trace, "BackgroundColor3", "Accent")
+    corner(trace, 2)
+
+    task.spawn(function()
+        while hero.Parent do
+            tw(trace, { Size = UDim2.fromOffset(145, 2), BackgroundTransparency = 0.08 }, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(heroGlow, { Transparency = 0.84 }, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(statusDotGlow, { Transparency = 0.03 }, 0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(statusDot, { Size = UDim2.fromOffset(9, 9) }, 0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.55)
+            if not hero.Parent then break end
+            tw(trace, { Size = UDim2.fromOffset(52, 2), BackgroundTransparency = 0.32 }, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(heroGlow, { Transparency = 0.94 }, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(statusDotGlow, { Transparency = 0.56 }, 0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            tw(statusDot, { Size = UDim2.fromOffset(7, 7) }, 0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.55)
+        end
+    end)
+
+    task.spawn(function()
+        if not player then return end
+        local ok, image = pcall(function()
+            local content = Players:GetUserThumbnailAsync(
+                player.UserId,
+                Enum.ThumbnailType.HeadShot,
+                Enum.ThumbnailSize.Size100x100
+            )
+            return content
+        end)
+        if ok and image and avatar.Parent then
+            avatar.Image = image
+        end
+    end)
+
+    win._homeStatus = statusValue
+    win._homeStatusDot = statusDot
+    win._homeStatusDotGlow = statusDotGlow
+    win._homePlan = planValue
+    -- Backward-compatible aliases for existing setters.
+    win._mainStatus = statusValue
+    win._mainStatusDot = statusDot
+    win._mainStatusDotGlow = statusDotGlow
+    win._mainPlan = planValue
 end
 
 --------------------------------------------------------------------------
@@ -1131,22 +1239,22 @@ function Library:CreateWindow(opts)
     -- compact brand row: title -> version -> subtitle, with fixed bounds so nothing overlaps
     local title = label(win, top, opts.Title or "NovaUI", 15, "Text", FONT_BOLD)
     title.Position = UDim2.fromOffset(34, 0)
-    title.Size = UDim2.fromOffset(145, 46)
+    title.Size = UDim2.fromOffset(112, 46)
     title.TextTruncate = Enum.TextTruncate.AtEnd
 
     local versionPill = New("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 186, 0.5, 0),
-        Size = UDim2.fromOffset(54, 19), BackgroundTransparency = 0.84, Parent = top })
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 152, 0.5, 0),
+        Size = UDim2.fromOffset(50, 19), BackgroundTransparency = 0.84, Parent = top })
     bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
-    local versionText = label(win, versionPill, "v" .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
+    local versionText = label(win, versionPill, "v." .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
     versionText.Size = UDim2.fromScale(1, 1)
     versionText.TextXAlignment = Enum.TextXAlignment.Center
     versionText.TextYAlignment = Enum.TextYAlignment.Center
 
     if opts.SubTitle then
         local sub = label(win, top, opts.SubTitle, 11, "SubText")
-        sub.Position = UDim2.fromOffset(248, 0)
-        sub.Size = UDim2.new(0, 170, 1, 0)
+        sub.Position = UDim2.fromOffset(214, 0)
+        sub.Size = UDim2.new(0, 150, 1, 0)
         sub.TextTruncate = Enum.TextTruncate.AtEnd
     end
 
@@ -1264,6 +1372,9 @@ function Window:SetScriptStatus(text, colorKey)
     if self._mainStatus then self._mainStatus.Text = self._scriptStatus end
     if self._mainStatusDot and colorKey and self.Theme[colorKey] then
         self._mainStatusDot.BackgroundColor3 = self.Theme[colorKey]
+        if self._mainStatusDotGlow then
+            self._mainStatusDotGlow.Color = self.Theme[colorKey]
+        end
     end
 end
 
@@ -1311,7 +1422,7 @@ function Window:_select(tab)
         local on = t == tab
         t.Page.Visible = on
         tw(t._btn, {
-            BackgroundTransparency = on and 0.90 or 1,
+            BackgroundTransparency = on and 0.94 or 1,
         }, 0.18, Enum.EasingStyle.Quint)
         tw(t._indicator, {
             BackgroundTransparency = on and 0 or 1,
@@ -1355,7 +1466,7 @@ function Window:Tab(opts)
     local tab = setmetatable({ Window = win }, Tab)
 
     local btn = New("TextButton", {
-        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 34),
+        Text = "", AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 32),
         BackgroundTransparency = 1, LayoutOrder = #win.Tabs + 1, Parent = win.TabList })
     btn.BackgroundColor3 = win.Theme.Accent
     table.insert(win._bound, { btn, "BackgroundColor3", "Accent" })
@@ -1370,7 +1481,7 @@ function Window:Tab(opts)
 
     local iconBubble = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Parent = btn })
+        Size = UDim2.fromOffset(18, 18), BackgroundTransparency = 1, Parent = btn })
     bind(win, iconBubble, "BackgroundColor3", "Accent")
     corner(iconBubble, 7)
     local iconScale = New("UIScale", { Scale = 1, Parent = iconBubble })
@@ -1387,11 +1498,11 @@ function Window:Tab(opts)
             iconInst = New("ImageLabel", {
                 Image = toImage(iconValue), BackgroundTransparency = 1,
                 AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(14, 14), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
+                Size = UDim2.fromOffset(12, 12), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
         else
             -- Explicit text/emoji remains supported; automatic icons use native shapes so unsupported glyphs never become squares.
             iconInst = New("TextLabel", {
-                Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 12,
+                Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 10,
                 TextColor3 = win.Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center,
                 TextYAlignment = Enum.TextYAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = iconBubble })
         end
@@ -1402,8 +1513,8 @@ function Window:Tab(opts)
 
     local lbl = New("TextLabel", {
         Text = opts.Title or "Tab", Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(40, 0),
-        Size = UDim2.new(1, -(opts.Badge and 72 or 50), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
+        TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(34, 0),
+        Size = UDim2.new(1, -(opts.Badge and 66 or 46), 1, 0), TextColor3 = win.Theme.SubText, Parent = btn })
 
     local badge
     if opts.Badge ~= nil then
@@ -1435,20 +1546,20 @@ function Window:Tab(opts)
             tw(btn, { BackgroundTransparency = 0.91 }, 0.16, Enum.EasingStyle.Quint)
             tw(tabGlow, { Transparency = 0.86 }, 0.16, Enum.EasingStyle.Quint)
         end
-        tw(iconScale, { Scale = win._active == tab and 1.06 or 1.04 }, 0.18, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 0.98 or 0.94 }, 0.18, Enum.EasingStyle.Back)
     end)
     btn.MouseLeave:Connect(function()
         if win._active ~= tab then
             tw(btn, { BackgroundTransparency = 1 }, 0.18, Enum.EasingStyle.Quint)
             tw(tabGlow, { Transparency = 0.96 }, 0.18, Enum.EasingStyle.Quint)
         end
-        tw(iconScale, { Scale = win._active == tab and 1.05 or 1 }, 0.18, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 0.97 or 0.91 }, 0.18, Enum.EasingStyle.Back)
     end)
     btn.MouseButton1Down:Connect(function()
-        tw(iconScale, { Scale = 0.96 }, 0.08, Enum.EasingStyle.Quad)
+        tw(iconScale, { Scale = 0.86 }, 0.08, Enum.EasingStyle.Quad)
     end)
     btn.MouseButton1Up:Connect(function()
-        tw(iconScale, { Scale = win._active == tab and 1.06 or 1.04 }, 0.14, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 0.98 or 0.94 }, 0.14, Enum.EasingStyle.Back)
     end)
     btn.MouseButton1Click:Connect(function() win:_select(tab) end)
 
@@ -1469,8 +1580,9 @@ function Window:Tab(opts)
         end
     end)
 
-    if string.lower(tostring(opts.Title or "")):find("main", 1, true) then
-        createMainDashboard(win, tab)
+    local tabTitleLower = string.lower(tostring(opts.Title or ""))
+    if tabTitleLower == "home" or tabTitleLower:find("home", 1, true) then
+        createHomeDashboard(win, tab)
     end
 
     if #win.Tabs == 1 then win:_select(tab) end
