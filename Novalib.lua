@@ -151,19 +151,6 @@ local function toImage(s)
     return s
 end
 
-local function iconFor(title)
-    local s = string.lower(tostring(title or ""))
-    if s:find("aim") or s:find("combat") or s:find("target") then return "✦" end
-    if s:find("visual") or s:find("esp") or s:find("render") then return "◉" end
-    if s:find("movement") or s:find("speed") or s:find("fly") then return "➤" end
-    if s:find("player") then return "♙" end
-    if s:find("setting") or s:find("config") then return "⚙" end
-    if s:find("info") or s:find("about") then return "ⓘ" end
-    if s:find("script") or s:find("misc") then return "◆" end
-    if s:find("home") then return "⌂" end
-    return "✧"
-end
-
 -- theme binding ----------------------------------------------------------
 local function bind(win, inst, prop, key)
     inst[prop] = win.Theme[key]
@@ -202,6 +189,104 @@ local function label(win, parent, text, size, key, font)
     return l
 end
 
+local function iconKindFor(title)
+    local s = string.lower(tostring(title or ""))
+    if s:find("main") or s:find("home") or s:find("dashboard") then return "home" end
+    if s:find("player") then return "player" end
+    if s:find("aim") or s:find("combat") or s:find("target") then return "combat" end
+    if s:find("visual") or s:find("esp") or s:find("render") then return "visual" end
+    if s:find("movement") or s:find("speed") or s:find("fly") then return "movement" end
+    if s:find("setting") or s:find("config") then return "settings" end
+    if s:find("info") or s:find("about") then return "info" end
+    if s:find("script") or s:find("misc") then return "misc" end
+    return "misc"
+end
+
+local function newIconPart(parent, size, position, color, radius, rotation)
+    local f = New("Frame", {
+        Size = size, Position = position, BackgroundColor3 = color, BackgroundTransparency = 0, Parent = parent })
+    if radius then corner(f, radius) end
+    if rotation then f.Rotation = rotation end
+    return f
+end
+
+local function createNativeIcon(win, parent, kind)
+    local holder = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = parent })
+    holder:SetAttribute("NovaIconKind", kind)
+
+    local parts = {}
+    local function part(size, pos, radius, rotation, strokeMode)
+        local f = newIconPart(holder, size, pos, win.Theme.SubText, radius, rotation)
+        table.insert(parts, f)
+        if strokeMode then
+            local st = New("UIStroke", { Thickness = 1.7, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = f })
+            bind(win, st, "Color", "SubText")
+        else
+            bind(win, f, "BackgroundColor3", "SubText")
+        end
+        return f
+    end
+
+    if kind == "home" then
+        part(UDim2.fromOffset(10, 9), UDim2.fromOffset(9, 12), 2, 0)
+        part(UDim2.fromOffset(8, 6), UDim2.fromOffset(4, 8), 1, -45)
+        part(UDim2.fromOffset(8, 6), UDim2.fromOffset(12, 8), 1, 45)
+        part(UDim2.fromOffset(3, 5), UDim2.fromOffset(12, 16), 1, 0)
+    elseif kind == "player" then
+        part(UDim2.fromOffset(7, 7), UDim2.fromOffset(10, 4), 4, 0)
+        part(UDim2.fromOffset(13, 8), UDim2.fromOffset(7, 13), 6, 0)
+    elseif kind == "visual" then
+        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        ring.BackgroundTransparency = 1
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(11, 11), 3, 0)
+    elseif kind == "combat" then
+        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        ring.BackgroundTransparency = 1
+        part(UDim2.fromOffset(3, 11), UDim2.fromOffset(12, 7), 1, 0)
+        part(UDim2.fromOffset(11, 3), UDim2.fromOffset(8, 12), 1, 0)
+    elseif kind == "movement" then
+        part(UDim2.fromOffset(15, 3), UDim2.fromOffset(6, 12), 2, -45)
+        part(UDim2.fromOffset(8, 3), UDim2.fromOffset(5, 7), 2, 45)
+        part(UDim2.fromOffset(3, 12), UDim2.fromOffset(12, 7), 1, 0)
+    elseif kind == "settings" then
+        local gear = part(UDim2.fromOffset(11, 11), UDim2.fromOffset(8, 8), 3, 0, true)
+        gear.BackgroundTransparency = 1
+        part(UDim2.fromOffset(3, 15), UDim2.fromOffset(12, 6), 1, 0)
+        part(UDim2.fromOffset(15, 3), UDim2.fromOffset(6, 12), 1, 0)
+        part(UDim2.fromOffset(5, 5), UDim2.fromOffset(11, 11), 3, 0)
+    elseif kind == "info" then
+        local ring = part(UDim2.fromOffset(17, 17), UDim2.fromOffset(5, 5), 9, 0, true)
+        ring.BackgroundTransparency = 1
+        local i = label(win, holder, "i", 13, "SubText", FONT_BOLD)
+        i.Size = UDim2.fromScale(1, 1)
+        i.TextXAlignment = Enum.TextXAlignment.Center
+        i.TextYAlignment = Enum.TextYAlignment.Center
+        table.insert(parts, i)
+    else
+        part(UDim2.fromOffset(11, 11), UDim2.fromOffset(8, 8), 2, 45)
+        part(UDim2.fromOffset(3, 3), UDim2.fromOffset(12, 12), 2, 0)
+    end
+
+    local function setOn(on)
+        for _, item in ipairs(parts) do
+            if item:IsA("TextLabel") then
+                item.TextColor3 = on and win.Theme.Accent or win.Theme.SubText
+            elseif item:IsA("Frame") then
+                local isStrokeOnly = item.BackgroundTransparency == 1
+                if isStrokeOnly then
+                    for _, c in ipairs(item:GetChildren()) do
+                        if c:IsA("UIStroke") then c.Color = on and win.Theme.Accent or win.Theme.SubText end
+                    end
+                else
+                    item.BackgroundColor3 = on and win.Theme.Accent or win.Theme.SubText
+                end
+            end
+        end
+    end
+
+    return holder, setOn
+end
+
 -- drag helper (mouse + touch) -------------------------------------------
 local function isPress(i)
     return i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch
@@ -232,8 +317,17 @@ local function makeRow(tab, title, desc, rightWidth)
     local row = New("Frame", {
         Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = tab.Page })
     bind(win, row, "BackgroundColor3", "Element")
-    corner(row, 10); stroke(win, row, "Stroke")
-    glow(win, row, 2.5, 0.94)
+    corner(row, 11)
+    local rowStroke = stroke(win, row, "Stroke")
+    local rowGlow = glow(win, row, 3, 0.96)
+    row.MouseEnter:Connect(function()
+        tw(rowGlow, { Transparency = 0.78 }, 0.18, Enum.EasingStyle.Quint)
+        tw(rowStroke, { Thickness = 1.35 }, 0.16, Enum.EasingStyle.Quint)
+    end)
+    row.MouseLeave:Connect(function()
+        tw(rowGlow, { Transparency = 0.96 }, 0.22, Enum.EasingStyle.Quint)
+        tw(rowStroke, { Thickness = 1 }, 0.16, Enum.EasingStyle.Quint)
+    end)
     New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = row })
 
     local header = New("Frame", {
@@ -858,6 +952,73 @@ local function CreateDivider(tab)
 end
 
 --------------------------------------------------------------------------
+-- MAIN DASHBOARD
+--------------------------------------------------------------------------
+local function createMainDashboard(win, tab)
+    local page = tab.Page
+    local holder = New("Frame", {
+        Size = UDim2.new(1, 0, 0, 128), BackgroundTransparency = 1, LayoutOrder = -1000, Parent = page })
+
+    local statusCard = New("Frame", {
+        Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 0, Parent = holder })
+    bind(win, statusCard, "BackgroundColor3", "Surface")
+    corner(statusCard, 14); local statusStroke = stroke(win, statusCard, "Stroke", 1); glow(win, statusCard, 3, 0.90)
+    pad(statusCard, 14, 12, 14, 12)
+
+    local statusDot = New("Frame", { Position = UDim2.fromOffset(14, 15), Size = UDim2.fromOffset(9, 9), Parent = statusCard })
+    bind(win, statusDot, "BackgroundColor3", "Success"); corner(statusDot, 5)
+    local statusTitle = label(win, statusCard, "SCRIPT STATUS", 10, "SubText", FONT_BOLD)
+    statusTitle.Position = UDim2.fromOffset(31, 10); statusTitle.Size = UDim2.new(1, -45, 0, 15)
+    local statusValue = label(win, statusCard, win._scriptStatus, 18, "Text", FONT_BOLD)
+    statusValue.Position = UDim2.fromOffset(14, 32); statusValue.Size = UDim2.new(1, -28, 0, 24)
+    local statusDesc = label(win, statusCard, "Ready for feature initialization", 11, "SubText")
+    statusDesc.Position = UDim2.fromOffset(14, 63); statusDesc.Size = UDim2.new(1, -28, 0, 16)
+    local statusLine = New("Frame", { Position = UDim2.new(0, 14, 1, -12), Size = UDim2.new(1, -28, 0, 2), Parent = statusCard })
+    bind(win, statusLine, "BackgroundColor3", "Success"); corner(statusLine, 2)
+
+    local playerCard = New("Frame", {
+        Position = UDim2.new(0.5, 5, 0, 0), Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 0, Parent = holder })
+    bind(win, playerCard, "BackgroundColor3", "Surface")
+    corner(playerCard, 14); glow(win, playerCard, 3, 0.90); pad(playerCard, 14, 12, 14, 12)
+
+    local avatar = New("Frame", { Position = UDim2.fromOffset(14, 15), Size = UDim2.fromOffset(38, 38), Parent = playerCard })
+    bind(win, avatar, "BackgroundColor3", "Accent"); corner(avatar, 19)
+    local avatarHead = New("Frame", { Position = UDim2.fromOffset(12, 7), Size = UDim2.fromOffset(14, 14), BackgroundColor3 = Color3.new(1,1,1), Parent = avatar })
+    corner(avatarHead, 7)
+    local avatarBody = New("Frame", { Position = UDim2.fromOffset(8, 22), Size = UDim2.fromOffset(22, 10), BackgroundColor3 = Color3.new(1,1,1), Parent = avatar })
+    corner(avatarBody, 6)
+
+    local playerTitle = label(win, playerCard, "PLAYER", 10, "SubText", FONT_BOLD)
+    playerTitle.Position = UDim2.fromOffset(62, 11); playerTitle.Size = UDim2.new(1, -76, 0, 15)
+    local playerName = label(win, playerCard, Players.LocalPlayer and Players.LocalPlayer.DisplayName or "Player", 15, "Text", FONT_BOLD)
+    playerName.Position = UDim2.fromOffset(62, 29); playerName.Size = UDim2.new(1, -76, 0, 20)
+    local playerUser = label(win, playerCard, "@" .. (Players.LocalPlayer and Players.LocalPlayer.Name or "Unknown"), 10, "SubText")
+    playerUser.Position = UDim2.fromOffset(62, 50); playerUser.Size = UDim2.new(1, -76, 0, 15)
+
+    local planPill = New("Frame", { Position = UDim2.new(0, 14, 1, -42), Size = UDim2.new(1, -28, 0, 27), Parent = playerCard })
+    bind(win, planPill, "BackgroundColor3", "Accent"); planPill.BackgroundTransparency = 0.86; corner(planPill, 9)
+    local planLabel = label(win, planPill, "PLAN", 9, "Accent", FONT_BOLD)
+    planLabel.Position = UDim2.fromOffset(10, 0); planLabel.Size = UDim2.fromOffset(32, 27); planLabel.TextYAlignment = Enum.TextYAlignment.Center
+    local planValue = label(win, planPill, win._playerPlan, 10, "Text", FONT_BOLD)
+    planValue.Position = UDim2.fromOffset(45, 0); planValue.Size = UDim2.new(1, -55, 1, 0); planValue.TextXAlignment = Enum.TextXAlignment.Right
+
+    win._mainStatus = statusValue
+    win._mainStatusDot = statusDot
+    win._mainPlan = planValue
+
+    local pulse = glow(win, statusCard, 5, 0.84)
+    task.spawn(function()
+        while statusCard.Parent do
+            tw(pulse, { Transparency = 0.58 }, 1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.0)
+            if not statusCard.Parent then break end
+            tw(pulse, { Transparency = 0.88 }, 1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1.0)
+        end
+    end)
+end
+
+--------------------------------------------------------------------------
 -- WINDOW
 --------------------------------------------------------------------------
 local Window = {}
@@ -907,6 +1068,8 @@ function Library:CreateWindow(opts)
     local win = setmetatable({
         Theme = mergeTheme(theme), Flags = {}, Tabs = {},
         _bound = {}, _themeCbs = {}, _conns = {}, _active = nil, _toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift,
+        _scriptStatus = opts.ScriptStatus or "Operational",
+        _playerPlan = opts.PlayerPlan or "Freemium",
     }, Window)
 
     local gui = New("ScreenGui", {
@@ -920,11 +1083,26 @@ function Library:CreateWindow(opts)
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
         Size = size, ClipsDescendants = true, Parent = gui })
     bind(win, main, "BackgroundColor3", "Background")
-    corner(main, 14); stroke(win, main, "Stroke")
-    glow(win, main, 5, 0.93)
+    corner(main, 16); stroke(win, main, "Stroke")
+    glow(win, main, 5, 0.91)
+    local mainGradient = New("UIGradient", { Rotation = 35, Parent = main })
+    mainGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, win.Theme.Background:Lerp(win.Theme.Accent, 0.06)),
+        ColorSequenceKeypoint.new(0.55, win.Theme.Background),
+        ColorSequenceKeypoint.new(1, win.Theme.Background:Lerp(win.Theme.Accent, 0.03)),
+    })
     local scale = New("UIScale", { Scale = 0.92, Parent = main })
     tw(scale, { Scale = 1 }, 0.3, Enum.EasingStyle.Back)
     win.Main = main
+    task.spawn(function()
+        while main.Parent do
+            tw(mainGradient, { Rotation = 125 }, 5.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(5.5)
+            if not main.Parent then break end
+            tw(mainGradient, { Rotation = 35 }, 5.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(5.5)
+        end
+    end)
 
     -- top bar
     local top = New("Frame", { Size = UDim2.new(1, 0, 0, 46), Parent = main })
@@ -939,14 +1117,31 @@ function Library:CreateWindow(opts)
     local dot = New("Frame", {
         AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), Size = UDim2.fromOffset(10, 10), Parent = top })
     bind(win, dot, "BackgroundColor3", "Accent"); corner(dot, 5)
+    local dotGlow = glow(win, dot, 4, 0.72)
+    task.spawn(function()
+        while dot.Parent do
+            tw(dotGlow, { Transparency = 0.42 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.75)
+            if not dot.Parent then break end
+            tw(dotGlow, { Transparency = 0.86 }, 0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(0.75)
+        end
+    end)
+    local versionPill = New("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 34, 0.5, 0),
+        Size = UDim2.fromOffset(54, 20), BackgroundTransparency = 0.82, Parent = top })
+    bind(win, versionPill, "BackgroundColor3", "Accent"); corner(versionPill, 10)
+    local versionText = label(win, versionPill, "v" .. tostring(Library.Version), 9, "Accent", FONT_BOLD)
+    versionText.Size = UDim2.fromScale(1, 1); versionText.TextXAlignment = Enum.TextXAlignment.Center; versionText.TextYAlignment = Enum.TextYAlignment.Center
+
     local title = label(win, top, opts.Title or "NovaUI", 15, "Text", FONT_BOLD)
-    title.Position = UDim2.fromOffset(34, 0); title.Size = UDim2.new(0, 200, 1, 0)
+    title.Position = UDim2.fromOffset(66, 0); title.Size = UDim2.new(0, 200, 1, 0)
     if opts.SubTitle then
         title.Size = UDim2.new(0, 0, 1, 0); title.AutomaticSize = Enum.AutomaticSize.X
         title.TextTruncate = Enum.TextTruncate.None
         local sub = label(win, top, opts.SubTitle, 12, "SubText")
         sub.Position = UDim2.new(0, 34, 0, 0); sub.Size = UDim2.new(0, 200, 1, 0)
-        local function place() sub.Position = UDim2.new(0, 34 + title.AbsoluteSize.X + 10, 0, 0) end
+        local function place() sub.Position = UDim2.new(0, 66 + title.AbsoluteSize.X + 10, 0, 0) end
         title:GetPropertyChangedSignal("AbsoluteSize"):Connect(place); task.defer(place)
     end
 
@@ -995,13 +1190,14 @@ function Library:CreateWindow(opts)
     local side = New("Frame", {
         Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 164, 1, -46), Parent = main })
     bind(win, side, "BackgroundColor3", "Surface")
-    corner(side, 12)
+    side.BackgroundTransparency = 0.14
+    corner(side, 14)
     -- fillers square off the top and right corners; only bottom-left stays round (matches the window)
-    local sideFillTop = New("Frame", { Size = UDim2.new(1, 0, 0, 12), Parent = side })
+    local sideFillTop = New("Frame", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Parent = side })
     bind(win, sideFillTop, "BackgroundColor3", "Surface")
-    local sideFillRight = New("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 12, 1, 0), Parent = side })
+    local sideFillRight = New("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, 12, 1, 0), BackgroundTransparency = 1, Parent = side })
     bind(win, sideFillRight, "BackgroundColor3", "Surface")
-    local sideLine = New("Frame", { Position = UDim2.new(1, -1, 0, 0), Size = UDim2.new(0, 1, 1, 0), Parent = side })
+    local sideLine = New("Frame", { Position = UDim2.new(1, -1, 0, 0), Size = UDim2.new(0, 1, 1, 0), BackgroundTransparency = 1, Parent = side })
     bind(win, sideLine, "BackgroundColor3", "Stroke")
     local tabList = New("ScrollingFrame", {
         Size = UDim2.new(1, -1, 1, 0), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -1035,7 +1231,44 @@ function Library:CreateWindow(opts)
 end
 
 function Window:Toggle()
-    self.Main.Visible = not self.Main.Visible
+    local showing = not self.Main.Visible
+    if showing then
+        self.Main.Visible = true
+        local scale = self.Main:FindFirstChildOfClass("UIScale")
+        if scale then
+            scale.Scale = 0.96
+            tw(scale, { Scale = 1 }, 0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        end
+    else
+        local scale = self.Main:FindFirstChildOfClass("UIScale")
+        if scale then
+            tw(scale, { Scale = 0.96 }, 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        end
+        task.delay(0.15, function()
+            if self.Main and self.Main.Parent and not showing then self.Main.Visible = false end
+        end)
+    end
+end
+
+function Window:SetScriptStatus(text, colorKey)
+    self._scriptStatus = tostring(text or "Unknown")
+    if self._mainStatus then self._mainStatus.Text = self._scriptStatus end
+    if self._mainStatusDot and colorKey and self.Theme[colorKey] then
+        self._mainStatusDot.BackgroundColor3 = self.Theme[colorKey]
+    end
+end
+
+function Window:GetScriptStatus()
+    return self._scriptStatus
+end
+
+function Window:SetPlayerPlan(text)
+    self._playerPlan = tostring(text or "Freemium")
+    if self._mainPlan then self._mainPlan.Text = self._playerPlan end
+end
+
+function Window:GetPlayerPlan()
+    return self._playerPlan
 end
 
 function Window:Destroy()
@@ -1075,13 +1308,21 @@ function Window:_select(tab)
             BackgroundTransparency = on and 0 or 1,
             Size = UDim2.new(0, 3, 0, on and 20 or 7),
         }, 0.20, Enum.EasingStyle.Back)
+        if on then
+            t.Page.Position = UDim2.fromOffset(18, 0)
+            tw(t.Page, { Position = UDim2.fromOffset(0, 0) }, 0.28, Enum.EasingStyle.Quint)
+        else
+            t.Page.Position = UDim2.fromOffset(0, 0)
+        end
         if t._label then
             t._label.TextColor3 = on and self.Theme.Text or self.Theme.SubText
         end
-        if t._icon then
+        if t._iconPaint then
+            t._iconPaint(on)
+        elseif t._icon then
             if t._icon:IsA("ImageLabel") then
                 t._icon.ImageColor3 = on and self.Theme.Accent or self.Theme.SubText
-            else
+            elseif t._icon:IsA("TextLabel") then
                 t._icon.TextColor3 = on and self.Theme.Accent or self.Theme.SubText
             end
         end
@@ -1126,20 +1367,29 @@ function Window:Tab(opts)
     local iconScale = New("UIScale", { Scale = 1, Parent = iconBubble })
 
     local iconValue = opts.Icon
-    if iconValue == nil then iconValue = iconFor(opts.Title or "Tab") end
-
-    local iconInst
-    if isImage(iconValue) then
-        iconInst = New("ImageLabel", {
-            Image = toImage(iconValue), BackgroundTransparency = 1,
-            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-            Size = UDim2.fromOffset(17, 17), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
+    if iconValue == nil then
+        local kind = iconKindFor(opts.Title or "Tab")
+        local iconInst, iconPaint = createNativeIcon(win, iconBubble, kind)
+        tab._iconKind = kind
+        tab._iconPaint = iconPaint
     else
-        iconInst = New("TextLabel", {
-            Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 14,
-            TextColor3 = win.Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center,
-            TextYAlignment = Enum.TextYAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = iconBubble })
+        local iconInst
+        if isImage(iconValue) then
+            iconInst = New("ImageLabel", {
+                Image = toImage(iconValue), BackgroundTransparency = 1,
+                AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(17, 17), ImageColor3 = win.Theme.SubText, Parent = iconBubble })
+        else
+            -- Explicit text/emoji remains supported; automatic icons use native shapes so unsupported glyphs never become squares.
+            iconInst = New("TextLabel", {
+                Text = tostring(iconValue), Font = FONT_BOLD, TextSize = 14,
+                TextColor3 = win.Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center,
+                TextYAlignment = Enum.TextYAlignment.Center, Size = UDim2.fromScale(1, 1), Parent = iconBubble })
+        end
+        tab._icon = iconInst
     end
+
+    local iconInst = tab._icon or iconBubble:FindFirstChildOfClass("Frame")
 
     local lbl = New("TextLabel", {
         Text = opts.Title or "Tab", Font = FONT_BOLD, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
@@ -1173,13 +1423,23 @@ function Window:Tab(opts)
 
     btn.MouseEnter:Connect(function()
         if win._active ~= tab then
-            tw(btn, { BackgroundTransparency = 0.93 }, 0.12)
+            tw(btn, { BackgroundTransparency = 0.91 }, 0.16, Enum.EasingStyle.Quint)
+            tw(tabGlow, { Transparency = 0.80 }, 0.16, Enum.EasingStyle.Quint)
         end
-        tw(iconScale, { Scale = win._active == tab and 1.10 or 1.04 }, 0.16, Enum.EasingStyle.Back)
+        tw(iconScale, { Scale = win._active == tab and 1.12 or 1.07 }, 0.18, Enum.EasingStyle.Back)
     end)
     btn.MouseLeave:Connect(function()
-        if win._active ~= tab then tw(btn, { BackgroundTransparency = 1 }, 0.12) end
-        tw(iconScale, { Scale = win._active == tab and 1.08 or 1 }, 0.16, Enum.EasingStyle.Back)
+        if win._active ~= tab then
+            tw(btn, { BackgroundTransparency = 1 }, 0.18, Enum.EasingStyle.Quint)
+            tw(tabGlow, { Transparency = 0.94 }, 0.18, Enum.EasingStyle.Quint)
+        end
+        tw(iconScale, { Scale = win._active == tab and 1.08 or 1 }, 0.18, Enum.EasingStyle.Back)
+    end)
+    btn.MouseButton1Down:Connect(function()
+        tw(iconScale, { Scale = 0.94 }, 0.08, Enum.EasingStyle.Quad)
+    end)
+    btn.MouseButton1Up:Connect(function()
+        tw(iconScale, { Scale = win._active == tab and 1.12 or 1.07 }, 0.14, Enum.EasingStyle.Back)
     end)
     btn.MouseButton1Click:Connect(function() win:_select(tab) end)
 
@@ -1187,9 +1447,11 @@ function Window:Tab(opts)
         local on = win._active == tab
         lbl.TextColor3 = on and win.Theme.Text or win.Theme.SubText
         iconBubble.BackgroundColor3 = win.Theme.Accent
-        if iconInst:IsA("ImageLabel") then
+        if tab._iconPaint then
+            tab._iconPaint(on)
+        elseif iconInst:IsA("ImageLabel") then
             iconInst.ImageColor3 = on and win.Theme.Accent or win.Theme.SubText
-        else
+        elseif iconInst:IsA("TextLabel") then
             iconInst.TextColor3 = on and win.Theme.Accent or win.Theme.SubText
         end
         if badge then
@@ -1197,6 +1459,10 @@ function Window:Tab(opts)
             badge.TextColor3 = win.Theme.AccentText
         end
     end)
+
+    if string.lower(tostring(opts.Title or "")):find("main", 1, true) then
+        createMainDashboard(win, tab)
+    end
 
     if #win.Tabs == 1 then win:_select(tab) end
     return tab
